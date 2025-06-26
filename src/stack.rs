@@ -242,14 +242,14 @@ impl Stack {
             .function_by_offset(cfg.rtl_acquire_lock.as_u64() as u32 - cfg.modules.ntdll.as_u64() as u32)
             .context(s!("Missing unwind: RtlAcquireSRWLockExclusive"))?;
 
-        self.rtl_user_thread_size =
-            StackFrame::ignoring_set_fpreg(cfg.modules.ntdll.as_ptr(), rtl_user).context(s!("Failed to get frame size: RtlUserThreadStart"))?;
+        self.rtl_user_thread_size = StackFrame::ignoring_set_fpreg(cfg.modules.ntdll.as_ptr(), rtl_user)
+            .context(s!("Failed to get frame size: RtlUserThreadStart"))?;
 
         self.base_thread_size = StackFrame::ignoring_set_fpreg(cfg.modules.kernel32.as_ptr(), base_thread)
             .context(s!("Failed to get frame size: BaseThreadInitThunk"))?;
 
-        self.enum_date_size =
-            StackFrame::ignoring_set_fpreg(cfg.modules.kernel32.as_ptr(), enum_date).context(s!("Failed to get frame size: EnumDateFormatsExA"))?;
+        self.enum_date_size = StackFrame::ignoring_set_fpreg(cfg.modules.kernel32.as_ptr(), enum_date)
+            .context(s!("Failed to get frame size: EnumDateFormatsExA"))?;
 
         self.rlt_acquire_srw_size = StackFrame::ignoring_set_fpreg(cfg.modules.ntdll.as_ptr(), rtl_acquire_srw)
             .context(s!("Failed to get frame size: RtlAcquireSRWLockExclusive"))?;
@@ -274,7 +274,6 @@ impl Stack {
     ///
     /// * A [`CONTEXT`] with forged `RSP` and `RIP`, ready to be applied to a suspended thread.
     #[inline(always)]
-    #[rustfmt::skip]
     pub fn spoof_context(&self, cfg: &Config, ctx: CONTEXT) -> CONTEXT {
         unsafe {
             // Construct a fake execution context for the current thread,
@@ -329,7 +328,6 @@ impl Stack {
     /// # Returns
     ///
     /// * Returns `Ok(())` if the stack layout was applied successfully to all contexts.
-    #[rustfmt::skip]
     pub fn setup_layout(&self, ctxs: &mut [CONTEXT], cfg: &Config, kind: Obfuscation) -> Result<()> {
         let pe_kernelbase = PE::parse(cfg.modules.kernelbase.as_ptr());
         let tables = pe_kernelbase.unwind().entries().context(s!(

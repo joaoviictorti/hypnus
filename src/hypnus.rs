@@ -107,7 +107,6 @@ impl ObfMode {
     /// let mode = ObfMode::Heap;
     /// assert!(mode.contains(ObfMode::Heap));
     /// ```
-    #[allow(dead_code)]
     fn contains(self, other: ObfMode) -> bool {
         (self.0 & other.0) == other.0
     }
@@ -203,7 +202,8 @@ impl Hypnus {
     /// * `base` - A raw pointer to the memory region that will be used in the execution sequence.
     /// * `size` - The size (in bytes) of the memory region.
     /// * `time` - Delay (in seconds) to wait before resuming execution after encryption.
-    ///
+    /// * `mode` - Optional [`ObfMode`] for stack/heap layout changes.
+    /// 
     /// # Returns
     ///
     /// * A new [`Hypnus`] instance with the specified configuration.
@@ -378,10 +378,7 @@ impl Hypnus {
             ctxs[2].R8  = 0;
 
             // NtGetContextThread
-            let mut ctx_backup = CONTEXT {
-                ContextFlags: CONTEXT_FULL,
-                ..Default::default()
-            };
+            let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].jmp(self.cfg, self.cfg.nt_get_context_thread.into());
             ctxs[3].Rcx = current_thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
@@ -631,10 +628,7 @@ impl Hypnus {
             ctxs[2].R8  = 0;
 
             // NtGetContextThread
-            let mut ctx_backup = CONTEXT {
-                ContextFlags: CONTEXT_FULL,
-                ..Default::default()
-            };
+            let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].jmp(self.cfg, self.cfg.nt_get_context_thread.into());
             ctxs[3].Rcx = current_thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
@@ -780,10 +774,7 @@ impl Hypnus {
             }
 
             // Capture base context of suspended thread
-            let mut ctx_init = CONTEXT {
-                ContextFlags: CONTEXT_FULL,
-                ..Default::default()
-            };
+            let mut ctx_init = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             status = uwd::syscall!(obf!("NtGetContextThread"), h_thread, ctx_init.as_uwd_mut())? as NTSTATUS;
             if !NT_SUCCESS(status) {
                 bail!(s!("NtGetContextThread Failed"));
@@ -835,10 +826,7 @@ impl Hypnus {
             ctxs[2].R8  = 0;
 
             // NtGetContextThread
-            let mut ctx_backup = CONTEXT {
-                ContextFlags: CONTEXT_FULL,
-                ..Default::default()
-            };
+            let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].Rip = self.cfg.nt_get_context_thread.into();
             ctxs[3].Rcx = current_thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
@@ -1030,10 +1018,13 @@ pub(crate) struct Cfg;
 impl Cfg {
     /// CFG_CALL_TARGET_VALID flag indicating a valid indirect call target.
     const CFG_CALL_TARGET_VALID: usize = 1;
+    
     /// Used internally by Windows to identify per-process CFG state.
     const PROCESS_COOKIE: u32 = 36;
+    
     /// Used for combining with ProcessCookie to retrieve CFG policy.
     const PROCESS_USER_MODE_IOPL: u32 = 16;
+    
     /// Mitigation policy ID for Control Flow Guard (CFG)
     const ProcessControlFlowGuardPolicy: i32 = 7i32;
 
@@ -1124,7 +1115,7 @@ impl Cfg {
 }
 
 /// Lightweight wrapper for `NtSetEvent`, used in a Threadpool callback context.
-pub extern "C" fn NtSetEvent2(_: *mut c_void, event: *mut c_void, _: *mut c_void, _: u32) {
+extern "C" fn NtSetEvent2(_: *mut c_void, event: *mut c_void, _: *mut c_void, _: u32) {
     NtSetEvent(event, null_mut());
 }
 
