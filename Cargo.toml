@@ -1,0 +1,45 @@
+[package]
+name = "hypnus"
+version = "0.1.0"
+edition = "2024"
+description = "Memory Obfuscation in Rust"
+license = "MIT"
+readme = "README.md"
+authors = ["João Victor"]
+repository = "https://github.com/joaoviictorti/hypnus"
+homepage = "https://github.com/joaoviictorti/hypnus"
+keywords = ["memory", "obfuscation", "windows", "rust", "redteam"]
+categories = ["os", "security"]
+include = [
+    "src/**",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
+
+[dependencies]
+obfstr = "0.4.4"
+dinvk = "0.2.6"
+uwd = "0.2.4"
+anyhow = { version = "1.0.98", default-features = false }
+memchr = { version = "2.7.4", default-features = false }
+spin = { version = "0.10.0", default-features = false }
+
+[package.metadata.docs.rs]
+default-target = "x86_64-pc-windows-msvc"
+targets = [
+    "x86_64-pc-windows-gnu",
+    "x86_64-pc-windows-msvc",
+]
+
+[[example]]
+name = "timer"
+path = "examples/timer/main.rs"
+
+[[example]]
+name = "wait"
+path = "examples/wait/main.rs"
+
+[[example]]
+name = "apc"
+path = "examples/apc/main.rs"
