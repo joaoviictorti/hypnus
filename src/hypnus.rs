@@ -179,7 +179,7 @@ impl Heap {
 #[derive(Clone, Copy, Debug)]
 struct Hypnus {
     /// Base memory pointer to be manipulated or operated on.
-    base: *mut c_void,
+    base: u64,
 
     /// Size of the memory region.
     size: u64,
@@ -199,7 +199,7 @@ impl Hypnus {
     ///
     /// # Arguments
     ///
-    /// * `base` - A raw pointer to the memory region that will be used in the execution sequence.
+    /// * `base` - Memory region to encrypt/decrypt.
     /// * `size` - The size (in bytes) of the memory region.
     /// * `time` - Delay (in seconds) to wait before resuming execution after encryption.
     /// * `mode` - Optional [`ObfMode`] for stack/heap layout changes.
@@ -208,8 +208,8 @@ impl Hypnus {
     ///
     /// * A new [`Hypnus`] instance with the specified configuration.
     #[inline]
-    fn new(base: *mut c_void, size: u64, time: u64, mode: ObfMode) -> Result<Self> {
-        if base.is_null() || size == 0 || time == 0 {
+    fn new(base: u64, size: u64, time: u64, mode: ObfMode) -> Result<Self> {
+        if base == 0 || size == 0 || time == 0 {
             bail!(s!("Invalid arguments"))
         }
 
@@ -336,12 +336,12 @@ impl Hypnus {
             }
 
             // Duplicate current thread handle for context manipulation
-            let mut current_thread = null_mut();
+            let mut h_thread = null_mut();
             status = NtDuplicateObject(
                 NtCurrentProcess(),
                 NtCurrentThread(),
                 NtCurrentProcess(),
-                &mut current_thread,
+                &mut h_thread,
                 0,
                 0,
                 DUPLICATE_SAME_ACCESS,
@@ -362,9 +362,8 @@ impl Hypnus {
             ctxs[0].R8  = 0;
 
             // NtProtectVirtualMemory
-            let mut base = self.base as u64;
-            let mut size = self.size;
             let mut old_protect = 0u32;
+            let (mut base, mut size) = (self.base, self.size);
             ctxs[1].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
             ctxs[1].Rcx = NtCurrentProcess() as u64;
             ctxs[1].Rdx = base.as_u64();
@@ -380,12 +379,12 @@ impl Hypnus {
             // NtGetContextThread
             let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].jmp(self.cfg, self.cfg.nt_get_context_thread.into());
-            ctxs[3].Rcx = current_thread as u64;
+            ctxs[3].Rcx = h_thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
 
             // NtSetContextThread
             ctxs[4].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
-            ctxs[4].Rcx = current_thread as u64;
+            ctxs[4].Rcx = h_thread as u64;
             ctxs[4].Rdx = ctx_spoof.as_u64();
 
             // WaitForSingleObjectEx
@@ -409,7 +408,7 @@ impl Hypnus {
 
             // NtSetContextThread
             ctxs[8].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
-            ctxs[8].Rcx = current_thread as u64;
+            ctxs[8].Rcx = h_thread as u64;
             ctxs[8].Rdx = ctx_backup.as_u64();
 
             // NtSetEvent
@@ -462,7 +461,7 @@ impl Hypnus {
             }
 
             // Clean up resources
-            NtClose(current_thread);
+            NtClose(h_thread);
             CloseThreadpool(pool);
             events.iter().for_each(|h| {
                 NtClose(*h);
@@ -586,12 +585,12 @@ impl Hypnus {
             }
 
             // Get handle to current thread
-            let mut current_thread = null_mut();
+            let mut h_thread = null_mut();
             status = NtDuplicateObject(
                 NtCurrentProcess(),
                 NtCurrentThread(),
                 NtCurrentProcess(),
-                &mut current_thread,
+                &mut h_thread,
                 0,
                 0,
                 DUPLICATE_SAME_ACCESS,
@@ -612,9 +611,8 @@ impl Hypnus {
             ctxs[0].R8  = 0;
 
             // NtProtectVirtualMemory
-            let mut base = self.base as u64;
-            let mut size = self.size;
             let mut old_protect = 0u32;
+            let (mut base, mut size) = (self.base, self.size);
             ctxs[1].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
             ctxs[1].Rcx = NtCurrentProcess() as u64;
             ctxs[1].Rdx = base.as_u64();
@@ -630,17 +628,17 @@ impl Hypnus {
             // NtGetContextThread
             let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].jmp(self.cfg, self.cfg.nt_get_context_thread.into());
-            ctxs[3].Rcx = current_thread as u64;
+            ctxs[3].Rcx = h_thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
 
             // NtSetContextThread
             ctxs[4].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
-            ctxs[4].Rcx = current_thread as u64;
+            ctxs[4].Rcx = h_thread as u64;
             ctxs[4].Rdx = ctx_spoof.as_u64();
 
             // WaitForSingleObjectEx
             ctxs[5].jmp(self.cfg, self.cfg.wait_for_single.into());
-            ctxs[5].Rcx = current_thread as u64;
+            ctxs[5].Rcx = h_thread as u64;
             ctxs[5].Rdx = self.time * 1000;
             ctxs[5].R8  = 0;
 
@@ -659,7 +657,7 @@ impl Hypnus {
 
             // NtSetContextThread
             ctxs[8].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
-            ctxs[8].Rcx = current_thread as u64;
+            ctxs[8].Rcx = h_thread as u64;
             ctxs[8].Rdx = ctx_backup.as_u64();
 
             // NtSetEvent
@@ -712,7 +710,7 @@ impl Hypnus {
             }
 
             // Clean Resources
-            NtClose(current_thread);
+            NtClose(h_thread);
             CloseThreadpool(pool);
             events.iter().for_each(|h| {
                 NtClose(*h);
@@ -810,9 +808,8 @@ impl Hypnus {
             ctxs[0].R8  = 0;
 
             // NtProtectVirtualMemory
-            let mut base = self.base as u64;
-            let mut size = self.size;
             let mut old_protect = 0u32;
+            let (mut base, mut size) = (self.base, self.size);
             ctxs[1].Rip = self.cfg.nt_protect_virtual_memory.into();
             ctxs[1].Rcx = NtCurrentProcess() as u64;
             ctxs[1].Rdx = base.as_u64();
@@ -973,7 +970,7 @@ pub mod internal {
         }
 
         // Initializes the `Hypnus` structure, responsible for applying sleep or obfuscation.
-        match Hypnus::new(base, size, time, mode) {
+        match Hypnus::new(base as u64, size, time, mode) {
             Ok(hypnus) => {
                 // Creates the context to be passed into the new fiber.
                 // This includes the `Hypnus` object, obfuscation mode, and a reference to the master fiber.

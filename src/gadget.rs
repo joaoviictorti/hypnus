@@ -1,10 +1,12 @@
 use alloc::vec::Vec;
 use core::ffi::c_void;
+
 use dinvk::{
     data::{CONTEXT, IMAGE_RUNTIME_FUNCTION},
     parse::PE,
     shuffle,
 };
+
 use crate::config::Config;
 
 /// List of short jump opcode patterns mapped to their corresponding register.

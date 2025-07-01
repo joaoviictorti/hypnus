@@ -3,6 +3,7 @@ use core::{
     ffi::c_void,
     ptr::{NonNull, null_mut},
 };
+
 use dinvk::{data::*, link};
 
 /// Global handle to the custom heap used by `HypnusHeap`.

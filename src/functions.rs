@@ -4,7 +4,7 @@ use core::ffi::c_void;
 use spin::Once;
 use obfstr::obfstr as s;
 use dinvk::{GetModuleHandle, GetProcAddress};
-use dinvk::{data::*, get_ntdll_address, hash::*};
+use dinvk::{data::*, hash::{murmur3, jenkins3}, get_ntdll_address};
 
 use crate::data::*;
 
