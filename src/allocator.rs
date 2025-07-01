@@ -12,9 +12,6 @@ static mut HEAP_HANDLE: Option<NonNull<c_void>> = None;
 /// A thread-safe wrapper for managing a Windows Heap.
 pub struct HypnusHeap;
 
-/// Allows `HypnusHeap` to be safely shared across threads.
-unsafe impl Sync for HypnusHeap {}
-
 impl HypnusHeap {
     /// Flag used to create a growable heap.
     const HEAP_GROWABLE: u32 = 0x00000002;
