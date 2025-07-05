@@ -41,5 +41,5 @@ name = "wait"
 path = "examples/wait/main.rs"
 
 [[example]]
-name = "apc"
-path = "examples/apc/main.rs"
+name = "foliage"
+path = "examples/foliage/main.rs"
