@@ -27,7 +27,7 @@ cargo add hypnus
 
 ## Usage
 
-To use `hypnus`, simply import the crate and call one of the obfuscation macros: `timer!`, `wait!`, or `apc!`. These macros apply memory encryption and call stack spoofing both during the sleep window and throughout the chained API calls used to encrypt and decrypt memory, ensuring full execution flow concealment.
+To use `hypnus`, simply import the crate and call one of the obfuscation macros: `timer!`, `wait!`, or `foliage!`. These macros apply memory encryption and call stack spoofing both during the sleep window and throughout the chained API calls used to encrypt and decrypt memory, ensuring full execution flow concealment.
 
 > [!IMPORTANT]  
 > If you're encrypting only specific memory regions (e.g., heap, custom buffers), using the `Rust standard library (std)` is safe. However, when encrypting the entire PE image of the current process, it's strongly recommended to use `#[no_std]`.
@@ -81,7 +81,7 @@ fn main() {
 This technique is based on the [Foliage](https://github.com/realoriginal/foliage) method, which utilizes Asynchronous Procedure Calls (APCs) to execute spoofed callbacks on a suspended thread with call stack spoofing.
 
 ```rs
-use hypnus::apc;
+use hypnus::foliage;
 use core::ffi::c_void;
 
 fn main() {
@@ -93,7 +93,7 @@ fn main() {
     let delay = 5;
 
     // Sleep using APC
-    apc!(ptr, size, delay);
+    foliage!(ptr, size, delay);
 }
 ```
 
@@ -107,7 +107,7 @@ If you want to enable heap encryption or RWX protection, you must explicitly pas
 
 extern crate alloc;
 
-use hypnus::{apc, ObfMode, HypnusHeap};
+use hypnus::{foliage, ObfMode, HypnusHeap};
 use core::ffi::c_void;
 
 #[unsafe(no_mangle)]
@@ -121,7 +121,7 @@ fn main() -> u8 {
     let delay = 5;
 
     // Full obfuscation with heap encryption and RWX memory protection
-    apc!(ptr, size, delay, ObfMode::Heap | ObfMode::Rwx);
+    foliage!(ptr, size, delay, ObfMode::Heap | ObfMode::Rwx);
 
     0
 }
