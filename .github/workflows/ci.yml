@@ -37,7 +37,7 @@ jobs:
 
     strategy:
       matrix:
-        example: [apc, timer, wait]
+        example: [foliage, timer, wait]
 
     steps:
       - uses: actions/checkout@v4
