@@ -114,10 +114,7 @@ pub struct CFG_CALL_TARGET_INFO {
     pub Flags: usize,
 }
 
-/// Fiber entry function
 pub type LPFIBER_START_ROUTINE = Option<unsafe extern "system" fn(lpFiberParameter: *mut c_void)>;
-
-/// Fiber
 pub type ConvertThreadToFiberFn = unsafe extern "system" fn(lpParameter: *mut c_void) -> *mut c_void;
 pub type ConvertFiberToThreadFn = unsafe extern "system" fn() -> i32;
 pub type SwitchToFiberFn = unsafe extern "system" fn(lpFiber: *mut c_void);
@@ -128,7 +125,11 @@ pub type CreateFiberFn = unsafe extern "system" fn(
     lpParameter: *const c_void,
 ) -> *mut c_void;
 
-/// Pool Threads
+pub type CloseThreadpoolFn = unsafe extern "system" fn(Pool: *mut c_void) -> NTSTATUS;
+pub type TpAllocPoolFn = unsafe extern "system" fn(PoolReturn: *mut *mut c_void, Reserved: *mut c_void) -> NTSTATUS;
+pub type TpSetPoolMaxThreadsFn = unsafe extern "system" fn(Pool: *mut c_void, MaxThreads: u32);
+pub type TpSetPoolMinThreadsFn = unsafe extern "system" fn(Pool: *mut c_void, MinThreads: u32) -> NTSTATUS;
+pub type TpSetWaitFn = unsafe extern "system" fn(Wait: *mut c_void, Handle: *mut c_void, Timeout: *mut LARGE_INTEGER);
 pub type TpAllocFn = unsafe extern "system" fn(
     Timer: *mut *mut c_void,
     Callback: *mut c_void,
@@ -136,31 +137,10 @@ pub type TpAllocFn = unsafe extern "system" fn(
     CallbackEnviron: *mut TP_CALLBACK_ENVIRON_V3,
 ) -> NTSTATUS;
 
-pub type TpAllocPoolFn = unsafe extern "system" fn(
-    PoolReturn: *mut *mut c_void,
-    Reserved: *mut c_void,
-) -> NTSTATUS;
-
-pub type TpSetPoolMaxThreadsFn = unsafe extern "system" fn(
-    Pool: *mut c_void,
-    MaxThreads: u32,
-);
-
-pub type TpSetPoolMinThreadsFn = unsafe extern "system" fn(
-    Pool: *mut c_void,
-    MinThreads: u32,
-) -> NTSTATUS;
-
 pub type TpSetPoolStackInformationFn = unsafe extern "system" fn(
     Pool: *mut c_void,
     PoolStackInformation: *mut TP_POOL_STACK_INFORMATION,
 ) -> NTSTATUS;
-
-pub type TpSetWaitFn = unsafe extern "system" fn(
-    Wait: *mut c_void,
-    Handle: *mut c_void,
-    Timeout: *mut LARGE_INTEGER,
-);
 
 pub type TpSetTimerFn = unsafe extern "system" fn(
     Timer: *mut c_void,
@@ -169,26 +149,14 @@ pub type TpSetTimerFn = unsafe extern "system" fn(
     WindowLength: u32,
 );
 
-pub type CloseThreadpoolFn = unsafe extern "system" fn(
-    Pool: *mut c_void,
-) -> NTSTATUS;
-
-/// NTAPIs
-pub type NtCloseFn = unsafe extern "system" fn(
-    Handle: HANDLE,
-) -> NTSTATUS;
-
+pub type NtCloseFn = unsafe extern "system" fn(Handle: HANDLE) -> NTSTATUS;
+pub type NtSetEventFn = unsafe extern "system" fn(hEvent: *mut c_void, PreviousState: *mut i32) -> NTSTATUS;
 pub type NtCreateEventFn = unsafe extern "system" fn(
     EventHandle: *mut HANDLE,
     DesiredAccess: u32,
     ObjectAttributes: *mut c_void,
     EventType: EVENT_TYPE,
     InitialState: u8,
-) -> NTSTATUS;
-
-pub type NtSetEventFn = unsafe extern "system" fn(
-    hEvent: *mut c_void,
-    PreviousState: *mut i32,
 ) -> NTSTATUS;
 
 pub type NtWaitForSingleObjectFn = unsafe extern "system" fn(
@@ -242,13 +210,11 @@ pub type NtLockVirtualMemoryFn = unsafe extern "system" fn(
     MapType: u32,
 ) -> NTSTATUS;
 
-/// Heap
 pub type RtlWalkHeapFn = unsafe extern "system" fn(
     HeapHandle: *mut c_void,
     Entry: *mut RTL_HEAP_WALK_ENTRY,
 ) -> NTSTATUS;
 
-/// CFG Protections
 pub type SetProcessValidCallTargetsFn = unsafe extern "system" fn(
     hProcess: HANDLE,
     VirtualAddress: *mut c_void,
