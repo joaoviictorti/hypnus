@@ -17,7 +17,7 @@ use crate::{
     gadget::GadgetContext,
 };
 
-/// This macro uses the `TpSetTimer` API to schedule delayed, encrypted execution.
+/// Initiates execution obfuscation using the `TpSetTimer`.
 ///
 /// # Arguments
 ///
@@ -42,7 +42,7 @@ macro_rules! timer {
     };
 }
 
-/// This macro uses `TpSetWait` to create a delayed resume via thread pool wait objects.
+/// Initiates execution obfuscation using the `TpSetWait`.
 ///
 /// # Arguments
 ///
