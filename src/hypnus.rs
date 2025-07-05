@@ -317,7 +317,7 @@ impl Hypnus {
             TpSetTimer(timer_event, &mut delay, 0, 0);
 
             // Wait for the event to be set after context capture
-            let mut status = NtWaitForSingleObject(events[0], 0, null_mut());
+            status = NtWaitForSingleObject(events[0], 0, null_mut());
             if !NT_SUCCESS(status) {
                 bail!(s!("NtWaitForSingleObject Failed"));
             }
@@ -563,7 +563,7 @@ impl Hypnus {
             TpSetWait(wait_event, events[0], &mut delay);
 
             // Wait for the event to be set after context capture
-            let mut status = NtWaitForSingleObject(events[1], 0, null_mut());
+            status = NtWaitForSingleObject(events[1], 0, null_mut());
             if !NT_SUCCESS(status) {
                 bail!(s!("NtWaitForSingleObject Failed"));
             }
