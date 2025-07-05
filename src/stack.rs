@@ -110,12 +110,12 @@ impl GadgetKind {
         match self {
             GadgetKind::Call => &[
                 0x48, 0x83, 0x2C, 0x24, 0x02, // sub qword ptr [rsp], 2
-                0x48, 0x89, 0xEC, // mov rsp, rbp
-                0xC3, // ret
+                0x48, 0x89, 0xEC,             // mov rsp, rbp
+                0xC3,                         // ret
             ],
             GadgetKind::Jmp => &[
                 0x48, 0x89, 0xEC, // mov rsp, rbp
-                0xC3, // ret
+                0xC3,             // ret
             ],
         }
     }
@@ -328,7 +328,7 @@ impl Stack {
     /// # Returns
     ///
     /// * Returns `Ok(())` if the stack layout was applied successfully to all contexts.
-    pub fn setup_layout(&self, ctxs: &mut [CONTEXT], cfg: &Config, kind: Obfuscation) -> Result<()> {
+    pub fn spoof(&self, ctxs: &mut [CONTEXT], cfg: &Config, kind: Obfuscation) -> Result<()> {
         let pe_kernelbase = PE::parse(cfg.modules.kernelbase.as_ptr());
         let tables = pe_kernelbase.unwind().entries().context(s!(
             "Failed to read IMAGE_RUNTIME_FUNCTION entries from .pdata section"
@@ -348,7 +348,7 @@ impl Stack {
             for ctx in ctxs.iter_mut() {
                 ctx.Rbp = match kind {
                     Obfuscation::Timer | Obfuscation::Wait => ctx.Rsp,
-                    Obfuscation::Apc => {
+                    Obfuscation::Foliage => {
                         // Inject NtTestAlert as stack return address to trigger APC delivery
                         (ctx.Rsp as *mut u64).write(cfg.nt_test_alert.into());
                         ctx.Rsp

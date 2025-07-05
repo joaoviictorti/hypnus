@@ -2,10 +2,10 @@ use alloc::string::String;
 use core::{ffi::c_void, mem::zeroed, ptr::null_mut};
 
 use uwd::AsUwd;
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use obfstr::{obfstr as obf, obfstring as s};
 use dinvk::{NtCurrentProcess, NtCurrentThread};
-use dinvk::{data::*, parse::PE};
+use dinvk::data::*;
 
 use crate::{
     allocator::HypnusHeap,
@@ -62,13 +62,13 @@ macro_rules! wait {
 /// * `$time` - Delay in seconds before resuming execution.
 /// * `$mode` *(optional)* - Obfuscation mode (e.g., stack spoofing or context modification).
 #[macro_export]
-macro_rules! apc {
+macro_rules! foliage {
     ($base:expr, $size:expr, $time:expr) => {
-        $crate::internal::hypnus_entry($base, $size, $time, $crate::Obfuscation::Apc, $crate::ObfMode::None)
+        $crate::internal::hypnus_entry($base, $size, $time, $crate::Obfuscation::Foliage, $crate::ObfMode::None)
     };
 
     ($base:expr, $size:expr, $time:expr, $mode:expr) => {
-        $crate::internal::hypnus_entry($base, $size, $time, $crate::Obfuscation::Apc, $mode)
+        $crate::internal::hypnus_entry($base, $size, $time, $crate::Obfuscation::Foliage, $mode)
     };
 }
 
@@ -81,7 +81,7 @@ pub enum Obfuscation {
     Wait,
 
     /// The technique using APC (`NtQueueApcThread`).
-    Apc,
+    Foliage,
 }
 
 /// Represents bit-by-bit options for performing obfuscation in different modes
@@ -230,7 +230,7 @@ impl Hypnus {
     /// * `Err` - if any internal API fails during the timer-based staging.
     fn timer(&mut self) -> Result<()> {
         unsafe {
-            // Preparation execution mode
+            // Determine if heap obfuscation and RWX memory should be use
             let heap = self.mode.contains(ObfMode::Heap);
             let protection = if self.mode.contains(ObfMode::Rwx) {
                 PAGE_EXECUTE_READWRITE
@@ -262,10 +262,7 @@ impl Hypnus {
             }
 
             // Sets custom stack size for the thread pool
-            let mut stack = TP_POOL_STACK_INFORMATION {
-                StackCommit: 0x80000,
-                StackReserve: 0x80000,
-            };
+            let mut stack = TP_POOL_STACK_INFORMATION { StackCommit: 0x80000, StackReserve: 0x80000 };
             status = TpSetPoolStackInformation(pool, &mut stack);
             if !NT_SUCCESS(status) {
                 bail!(s!("TpSetPoolStackInformation Failed"));
@@ -275,10 +272,7 @@ impl Hypnus {
             TpSetPoolMaxThreads(pool, 1);
 
             // Configure callback environment to use the custom pool
-            let mut env = TP_CALLBACK_ENVIRON_V3 {
-                Pool: pool,
-                ..Default::default()
-            };
+            let mut env = TP_CALLBACK_ENVIRON_V3 { Pool: pool, ..Default::default() };
 
             // First timer: capture current context
             let mut timer_ctx = null_mut();
@@ -328,7 +322,7 @@ impl Hypnus {
                 bail!(s!("NtWaitForSingleObject Failed"));
             }
 
-            // Prepare chained CONTEXT structures
+            // Clone the base context 10 times for the full spoofed execution chain
             let mut ctxs = [ctx_init; 10];
             for ctx in &mut ctxs {
                 ctx.Rax = self.cfg.nt_continue.as_u64();
@@ -355,13 +349,13 @@ impl Hypnus {
             ctx_init.Rsp = current_rsp();
             let mut ctx_spoof = self.cfg.stack.spoof_context(self.cfg, ctx_init);
 
-            // NtWaitForSingleObject
+            // The chain will wait until `event` is signaled.
             ctxs[0].jmp(self.cfg, self.cfg.nt_wait_for_single.into());
             ctxs[0].Rcx = events[1] as u64;
             ctxs[0].Rdx = 0;
             ctxs[0].R8  = 0;
 
-            // NtProtectVirtualMemory
+            // Temporarily makes the target memory region writable before encryption.
             let mut old_protect = 0u32;
             let (mut base, mut size) = (self.base, self.size);
             ctxs[1].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
@@ -370,54 +364,57 @@ impl Hypnus {
             ctxs[1].R8  = size.as_u64();
             ctxs[1].R9  = PAGE_READWRITE as u64;
 
-            // SystemFunction040
+            // Encrypts or masks the specified memory region in-place (RC4-style).
             ctxs[2].jmp(self.cfg, self.cfg.system_function040.into());
             ctxs[2].Rcx = base;
             ctxs[2].Rdx = size;
             ctxs[2].R8  = 0;
 
-            // NtGetContextThread
+            // Saves the original CONTEXT so it can be restored later.
             let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].jmp(self.cfg, self.cfg.nt_get_context_thread.into());
             ctxs[3].Rcx = h_thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
 
-            // NtSetContextThread
+            // Injects a spoofed CONTEXT to modify return flow (stack/frame spoofing).
             ctxs[4].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
             ctxs[4].Rcx = h_thread as u64;
             ctxs[4].Rdx = ctx_spoof.as_u64();
 
-            // WaitForSingleObjectEx
+            // Sleep primitive using the current thread handle and a delay.
             ctxs[5].jmp(self.cfg, self.cfg.wait_for_single.into());
-            ctxs[5].Rcx = NtCurrentProcess() as u64;
+            ctxs[5].Rcx = h_thread as u64;
             ctxs[5].Rdx = self.time * 1000;
             ctxs[5].R8  = 0;
 
-            // SystemFunction041
+            // Decrypts (unmasks) the memory after waking up.
             ctxs[6].jmp(self.cfg, self.cfg.system_function041.into());
             ctxs[6].Rcx = base;
             ctxs[6].Rdx = size;
             ctxs[6].R8  = 0;
 
-            // NtProtectVirtualMemory
+            // Restores the memory protection after decryption.
             ctxs[7].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
             ctxs[7].Rcx = NtCurrentProcess() as u64;
             ctxs[7].Rdx = base.as_u64();
             ctxs[7].R8  = size.as_u64();
             ctxs[7].R9  = protection;
 
-            // NtSetContextThread
+            // Restores the original thread context — cleanup step.
             ctxs[8].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
             ctxs[8].Rcx = h_thread as u64;
             ctxs[8].Rdx = ctx_backup.as_u64();
 
-            // NtSetEvent
+            // Notify that the obfuscation steps 
+            // (encrypt → delay → decrypt) have completed.
             ctxs[9].jmp(self.cfg, self.cfg.nt_set_event.into());
             ctxs[9].Rcx = events[2] as u64;
             ctxs[9].Rdx = 0;
 
-            // Write spoofed stack layout
-            self.cfg.stack.setup_layout(&mut ctxs, self.cfg, Obfuscation::Timer)?;
+            // Layout the entire spoofed CONTEXT chain on the stack
+            self.cfg.stack.spoof(&mut ctxs, self.cfg, Obfuscation::Timer)?;
+
+            // Write `old_protect` values into the expected return slots
             ((ctxs[1].Rsp + 0x28) as *mut u64).write(old_protect.as_u64());
             ((ctxs[7].Rsp + 0x28) as *mut u64).write(old_protect.as_u64());
 
@@ -440,7 +437,7 @@ impl Hypnus {
                 TpSetTimer(timer, &mut delay, 0, 0);
             }
 
-            // Obfuscate heap memory before executing the chain (if enabled)
+            // If heap obfuscation is enabled, encrypt memory before execution
             let key = if heap {
                 let key = core::arch::x86_64::_rdtsc().to_le_bytes();
                 Heap::obfuscate(&key);
@@ -449,18 +446,18 @@ impl Hypnus {
                 None
             };
 
-            // Trigger ROP execution and wait until completion
+            // Wait until the thread pool finishes the spoofed chain
             status = NtSignalAndWaitForSingleObject(events[1], events[2], 0, null_mut());
             if !NT_SUCCESS(status) {
                 bail!(s!("NtSignalAndWaitForSingleObject Failed"));
             }
 
-            // Re-obfuscate heap memory after execution completes (if enabled)
+            // De-obfuscate heap if needed
             if let Some(key) = key {
                 Heap::obfuscate(&key);
             }
 
-            // Clean up resources
+            // Clean up all handles
             NtClose(h_thread);
             CloseThreadpool(pool);
             events.iter().for_each(|h| {
@@ -479,7 +476,7 @@ impl Hypnus {
     /// * `Err` - if any part of the wait-based staging fails.
     fn wait(&mut self) -> Result<()> {
         unsafe {
-            // Preparation execution mode
+            // Determine if heap obfuscation and RWX memory should be use
             let heap = self.mode.contains(ObfMode::Heap);
             let protection = if self.mode.contains(ObfMode::Rwx) {
                 PAGE_EXECUTE_READWRITE
@@ -511,10 +508,7 @@ impl Hypnus {
             }
 
             // Sets custom stack size for the thread pool
-            let mut stack = TP_POOL_STACK_INFORMATION {
-                StackCommit: 0x80000,
-                StackReserve: 0x80000,
-            };
+            let mut stack = TP_POOL_STACK_INFORMATION { StackCommit: 0x80000, StackReserve: 0x80000 };
             status = TpSetPoolStackInformation(pool, &mut stack);
             if !NT_SUCCESS(status) {
                 bail!(s!("TpSetPoolStackInformation Failed"));
@@ -524,10 +518,7 @@ impl Hypnus {
             TpSetPoolMaxThreads(pool, 1);
 
             // Configure callback environment to use the custom pool
-            let mut env = TP_CALLBACK_ENVIRON_V3 {
-                Pool: pool,
-                ..Default::default()
-            };
+            let mut env = TP_CALLBACK_ENVIRON_V3 { Pool: pool, ..Default::default() };
 
             // First timer: capture current context
             let mut wait_ctx = null_mut();
@@ -577,7 +568,7 @@ impl Hypnus {
                 bail!(s!("NtWaitForSingleObject Failed"));
             }
 
-            // Create base spoofing chain from ctx_init
+            // Clone the base context 10 times for the full spoofed execution chain
             let mut ctxs = [ctx_init; 10];
             for ctx in &mut ctxs {
                 ctx.Rax = self.cfg.nt_continue.as_u64();
@@ -604,13 +595,13 @@ impl Hypnus {
             ctx_init.Rsp = current_rsp();
             let mut ctx_spoof = self.cfg.stack.spoof_context(self.cfg, ctx_init);
 
-            // NtWaitForSingleObject
+            // The chain will wait until `event` is signaled.
             ctxs[0].jmp(self.cfg, self.cfg.nt_wait_for_single.into());
             ctxs[0].Rcx = events[2] as u64;
             ctxs[0].Rdx = 0;
             ctxs[0].R8  = 0;
 
-            // NtProtectVirtualMemory
+            // Temporarily makes the target memory region writable before encryption.
             let mut old_protect = 0u32;
             let (mut base, mut size) = (self.base, self.size);
             ctxs[1].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
@@ -619,54 +610,57 @@ impl Hypnus {
             ctxs[1].R8  = size.as_u64();
             ctxs[1].R9  = PAGE_READWRITE as u64;
 
-            // SystemFunction040
+            // Encrypts or masks the specified memory region in-place (RC4-style).
             ctxs[2].jmp(self.cfg, self.cfg.system_function040.into());
             ctxs[2].Rcx = base;
             ctxs[2].Rdx = size;
             ctxs[2].R8  = 0;
 
-            // NtGetContextThread
+            // Saves the original CONTEXT so it can be restored later.
             let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].jmp(self.cfg, self.cfg.nt_get_context_thread.into());
             ctxs[3].Rcx = h_thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
 
-            // NtSetContextThread
+            // Injects a spoofed CONTEXT to modify return flow (stack/frame spoofing).
             ctxs[4].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
             ctxs[4].Rcx = h_thread as u64;
             ctxs[4].Rdx = ctx_spoof.as_u64();
 
-            // WaitForSingleObjectEx
+            // Sleep primitive using the current thread handle and a delay.
             ctxs[5].jmp(self.cfg, self.cfg.wait_for_single.into());
             ctxs[5].Rcx = h_thread as u64;
             ctxs[5].Rdx = self.time * 1000;
             ctxs[5].R8  = 0;
 
-            // SystemFunction041
+            // Decrypts (unmasks) the memory after waking up.
             ctxs[6].jmp(self.cfg, self.cfg.system_function041.into());
             ctxs[6].Rcx = base;
             ctxs[6].Rdx = size;
             ctxs[6].R8  = 0;
 
-            // NtProtectVirtualMemory
+            // Restores the memory protection after decryption.
             ctxs[7].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
             ctxs[7].Rcx = NtCurrentProcess() as u64;
             ctxs[7].Rdx = base.as_u64();
             ctxs[7].R8  = size.as_u64();
             ctxs[7].R9  = protection;
 
-            // NtSetContextThread
+            // Restores the original thread context — cleanup step.
             ctxs[8].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
             ctxs[8].Rcx = h_thread as u64;
             ctxs[8].Rdx = ctx_backup.as_u64();
 
-            // NtSetEvent
+            // Notify that the obfuscation steps 
+            // (encrypt → delay → decrypt) have completed.
             ctxs[9].jmp(self.cfg, self.cfg.nt_set_event.into());
             ctxs[9].Rcx = events[3] as u64;
             ctxs[9].Rdx = 0;
 
-            // Write spoofed return chain to each CONTEXT
-            self.cfg.stack.setup_layout(&mut ctxs, self.cfg, Obfuscation::Wait)?;
+            // Layout the entire spoofed CONTEXT chain on the stack
+            self.cfg.stack.spoof(&mut ctxs, self.cfg, Obfuscation::Wait)?;
+
+            // Write `old_protect` values into the expected return slots
             ((ctxs[1].Rsp + 0x28) as *mut u64).write(old_protect.as_u64());
             ((ctxs[7].Rsp + 0x28) as *mut u64).write(old_protect.as_u64());
 
@@ -689,7 +683,7 @@ impl Hypnus {
                 TpSetWait(wait, events[0], &mut delay);
             }
 
-            // Obfuscate heap memory before executing the chain (if enabled)
+            // If heap obfuscation is enabled, encrypt memory before execution
             let key = if heap {
                 let key = core::arch::x86_64::_rdtsc().to_le_bytes();
                 Heap::obfuscate(&key);
@@ -698,18 +692,18 @@ impl Hypnus {
                 None
             };
 
-            // Final synchronization point
+            // Wait until the thread pool finishes the spoofed chain
             status = NtSignalAndWaitForSingleObject(events[2], events[3], 0, null_mut());
             if !NT_SUCCESS(status) {
                 bail!(s!("NtSignalAndWaitForSingleObject Failed"));
             }
 
-            // Re-obfuscate heap memory after execution completes (if enabled)
+            // De-obfuscate heap if needed
             if let Some(key) = key {
                 Heap::obfuscate(&key);
             }
 
-            // Clean Resources
+            // Clean up all handles
             NtClose(h_thread);
             CloseThreadpool(pool);
             events.iter().for_each(|h| {
@@ -726,9 +720,9 @@ impl Hypnus {
     ///
     /// * `Ok(())` - on success.
     /// * `Err` - if any APC injection or thread manipulation step fails.
-    fn apc(&mut self) -> Result<()> {
+    fn foliage(&mut self) -> Result<()> {
         unsafe {
-            // Preparation execution mode
+            // Determine if heap obfuscation and RWX memory should be use
             let heap = self.mode.contains(ObfMode::Heap);
             let protection = if self.mode.contains(ObfMode::Rwx) {
                 PAGE_EXECUTE_READWRITE
@@ -736,7 +730,7 @@ impl Hypnus {
                 PAGE_EXECUTE_READ
             };
 
-            // Create synchronization event
+            // Create a manual-reset synchronization event to be signaled after execution
             let mut event = null_mut();
             let mut status = NtCreateEvent(
                 &mut event, 
@@ -750,7 +744,7 @@ impl Hypnus {
                 bail!(s!("NtCreateEvent Failed"));
             }
 
-            // Spawn suspended thread to inject APCs into
+            // Create a new thread in suspended state for APC injection
             let mut h_thread = null_mut::<c_void>();
             status = uwd::syscall!(
                 obf!("NtCreateThreadEx"),
@@ -771,23 +765,23 @@ impl Hypnus {
                 bail!(s!("NtCreateThreadEx Failed"));
             }
 
-            // Capture base context of suspended thread
+            // Get the initial context of the suspended thread
             let mut ctx_init = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             status = uwd::syscall!(obf!("NtGetContextThread"), h_thread, ctx_init.as_uwd_mut())? as NTSTATUS;
             if !NT_SUCCESS(status) {
                 bail!(s!("NtGetContextThread Failed"));
             }
 
-            // Create base spoofing chain from ctx_init
+            // Clone the base context 10 times for the full spoofed execution chain
             let mut ctxs = [ctx_init; 10];
 
-            // Get handle to current thread
-            let mut current_thread = null_mut();
+            // Duplicate the current thread handle
+            let mut thread = null_mut();
             status = NtDuplicateObject(
                 NtCurrentProcess(),
                 NtCurrentThread(),
                 NtCurrentProcess(),
-                &mut current_thread,
+                &mut thread,
                 0,
                 0,
                 DUPLICATE_SAME_ACCESS,
@@ -801,13 +795,13 @@ impl Hypnus {
             ctx_init.Rsp = current_rsp();
             let mut ctx_spoof = self.cfg.stack.spoof_context(self.cfg, ctx_init);
 
-            // NtWaitForSingleObject
+            // The chain will wait until `event` is signaled.
             ctxs[0].Rip = self.cfg.nt_wait_for_single.into();
             ctxs[0].Rcx = event as u64;
             ctxs[0].Rdx = 0;
             ctxs[0].R8  = 0;
 
-            // NtProtectVirtualMemory
+            // Temporarily makes the target memory region writable before encryption.
             let mut old_protect = 0u32;
             let (mut base, mut size) = (self.base, self.size);
             ctxs[1].Rip = self.cfg.nt_protect_virtual_memory.into();
@@ -816,58 +810,60 @@ impl Hypnus {
             ctxs[1].R8  = size.as_u64();
             ctxs[1].R9  = PAGE_READWRITE as u64;
 
-            // SystemFunction040
+            // Encrypts or masks the specified memory region in-place (RC4-style).
             ctxs[2].Rip = self.cfg.system_function040.into();
             ctxs[2].Rcx = base;
             ctxs[2].Rdx = size;
             ctxs[2].R8  = 0;
 
-            // NtGetContextThread
+            // Saves the original CONTEXT so it can be restored later.
             let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].Rip = self.cfg.nt_get_context_thread.into();
-            ctxs[3].Rcx = current_thread as u64;
+            ctxs[3].Rcx = thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
 
-            // NtSetContextThread
+            // Injects a spoofed CONTEXT to modify return flow (stack/frame spoofing).
             ctxs[4].Rip = self.cfg.nt_set_context_thread.into();
-            ctxs[4].Rcx = current_thread as u64;
+            ctxs[4].Rcx = thread as u64;
             ctxs[4].Rdx = ctx_spoof.as_u64();
 
-            // WaitForSingleObjectEx
+            // Sleep primitive using the current thread handle and a delay.
             ctxs[5].Rip = self.cfg.wait_for_single.into();
-            ctxs[5].Rcx = current_thread as u64;
+            ctxs[5].Rcx = thread as u64;
             ctxs[5].Rdx = self.time * 1000;
             ctxs[5].R8  = 0;
 
-            // SystemFunction041
+            // Decrypts (unmasks) the memory after waking up.
             ctxs[6].Rip = self.cfg.system_function041.into();
             ctxs[6].Rcx = base;
             ctxs[6].Rdx = size;
             ctxs[6].R8  = 0;
 
-            // NtProtectVirtualMemory
+            // Restores the memory protection after decryption.
             ctxs[7].Rip = self.cfg.nt_protect_virtual_memory.into();
             ctxs[7].Rcx = NtCurrentProcess() as u64;
             ctxs[7].Rdx = base.as_u64();
             ctxs[7].R8  = size.as_u64();
             ctxs[7].R9  = protection;
 
-            // NtSetContextThread
+            // Restores the original thread context — cleanup step.
             ctxs[8].Rip = self.cfg.nt_set_context_thread.into();
-            ctxs[8].Rcx = current_thread as u64;
+            ctxs[8].Rcx = thread as u64;
             ctxs[8].Rdx = ctx_backup.as_u64();
 
-            // RtlExitUserThread
+            // Gracefully terminates the helper thread after all steps are complete.
             ctxs[9].Rip = self.cfg.rtl_exit_user_thread.into();
             ctxs[9].Rcx = h_thread as u64;
             ctxs[9].Rdx = 0;
 
-            // Write spoofed return chain to each CONTEXT
-            self.cfg.stack.setup_layout(&mut ctxs, self.cfg, Obfuscation::Apc)?;
+            // Layout the entire spoofed CONTEXT chain on the stack
+            self.cfg.stack.spoof(&mut ctxs, self.cfg, Obfuscation::Foliage)?;
+
+            // Write `old_protect` values into the expected return slots
             ((ctxs[1].Rsp + 0x28) as *mut u64).write(old_protect.as_u64());
             ((ctxs[7].Rsp + 0x28) as *mut u64).write(old_protect.as_u64());
 
-            // Queue each CONTEXT via APC
+            // Queue each CONTEXT as an APC to be executed in sequence
             for ctx in &mut ctxs {
                 status = NtQueueApcThread(
                     h_thread,
@@ -882,13 +878,13 @@ impl Hypnus {
                 }
             }
 
-            // Resume the thread to trigger APC delivery
+            // Trigger the APC chain by resuming the thread in alertable state
             status = NtAlertResumeThread(h_thread, null_mut());
             if !NT_SUCCESS(status) {
                 bail!(s!("NtAlertResumeThread Failed"));
             }
 
-            // Obfuscate heap memory before executing the chain (if enabled)
+            // If heap obfuscation is enabled, encrypt memory before execution
             let key = if heap {
                 let key = core::arch::x86_64::_rdtsc().to_le_bytes();
                 Heap::obfuscate(&key);
@@ -897,20 +893,21 @@ impl Hypnus {
                 None
             };
 
-            // Final wait for execution to complete
+            // Wait until the thread finishes the spoofed chain
             status = NtSignalAndWaitForSingleObject(event, h_thread, 0, null_mut());
             if !NT_SUCCESS(status) {
                 bail!(s!("NtSignalAndWaitForSingleObject Failed"));
             }
 
-            // Re-obfuscate heap memory after execution completes (if enabled)
+            // De-obfuscate heap if needed
             if let Some(key) = key {
                 Heap::obfuscate(&key);
             }
 
+            // Clean up all handles
             NtClose(event);
             NtClose(h_thread);
-            NtClose(current_thread);
+            NtClose(thread);
         }
 
         Ok(())
@@ -918,7 +915,6 @@ impl Hypnus {
 }
 
 /// Internal module responsible for launching obfuscated execution flows.
-#[allow(unused_variables)]
 pub mod internal {
     use alloc::boxed::Box;
     use super::*;
@@ -938,15 +934,15 @@ pub mod internal {
     extern "system" fn hypnus_fiber(ctx: *mut c_void) {
         unsafe {
             let mut ctx = Box::from_raw(ctx as *mut FiberContext);
-            let result = match ctx.obf {
-                Obfuscation::Timer => ctx.hypnus.timer(),
-                Obfuscation::Wait => ctx.hypnus.wait(),
-                Obfuscation::Apc => ctx.hypnus.apc(),
+            let _result = match ctx.obf {
+                Obfuscation::Timer   => ctx.hypnus.timer(),
+                Obfuscation::Wait    => ctx.hypnus.wait(),
+                Obfuscation::Foliage => ctx.hypnus.foliage(),
             };
 
             #[cfg(debug_assertions)]
-            if let Err(e) = result {
-                dinvk::println!("[Hypnus] {:?}", e);
+            if let Err(_error) = _result {
+                dinvk::println!("[Hypnus] {:?}", _error);
             }
 
             SwitchToFiber(ctx.master);
@@ -1001,111 +997,9 @@ pub mod internal {
                 // Converts the fiber back into a regular thread (cleanup).
                 ConvertFiberToThread();
             }
-            Err(e) => {
+            Err(_error) => {
                 #[cfg(debug_assertions)]
-                dinvk::println!("[Hypnus::new] {:?}", e);
-            }
-        }
-    }
-}
-
-/// Wrapper for querying and modifying Control Flow Guard (CFG) policy
-pub(crate) struct Cfg;
-
-impl Cfg {
-    /// CFG_CALL_TARGET_VALID flag indicating a valid indirect call target.
-    const CFG_CALL_TARGET_VALID: usize = 1;
-    
-    /// Used internally by Windows to identify per-process CFG state.
-    const PROCESS_COOKIE: u32 = 36;
-    
-    /// Used for combining with ProcessCookie to retrieve CFG policy.
-    const PROCESS_USER_MODE_IOPL: u32 = 16;
-    
-    /// Mitigation policy ID for Control Flow Guard (CFG)
-    const ProcessControlFlowGuardPolicy: i32 = 7i32;
-
-    /// Checks if Control Flow Guard (CFG) is enabled for the current process.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(true)` if CFG is enforced, `Ok(false)` if not, or an error if the query fails.
-    pub fn is_enabled() -> Result<bool> {
-        let mut proc_info = EXTENDED_PROCESS_INFORMATION {
-            ExtendedProcessInfo: Self::ProcessControlFlowGuardPolicy as u32,
-            ..Default::default()
-        };
-
-        let status = NtQueryInformationProcess(
-            NtCurrentProcess(),
-            Self::PROCESS_COOKIE | Self::PROCESS_USER_MODE_IOPL,
-            &mut proc_info as *mut _ as *mut c_void,
-            size_of::<EXTENDED_PROCESS_INFORMATION>() as u32,
-            null_mut(),
-        );
-
-        if !NT_SUCCESS(status) {
-            bail!(s!("NtQueryInformationProcess Failed"));
-        }
-
-        Ok(proc_info.ExtendedProcessInfoBuffer != 0)
-    }
-
-    /// Adds a valid CFG call target for the given module base and target function.
-    ///
-    /// If CFG is not enabled, the call is silently ignored.
-    ///
-    /// # Arguments
-    ///
-    /// * `module` - Base address of the module.
-    /// * `function` - Function pointer inside the module to mark as valid.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(())` on success, or an error if the operation fails or CFG query fails.
-    pub fn add(module: usize, function: usize) -> Result<()> {
-        unsafe {
-            let nt_header = PE::parse(module as *mut c_void)
-                .nt_header()
-                .context(s!("Invalid NT header"))?;
-
-            // Memory range to apply the CFG policy
-            let size = ((*nt_header).OptionalHeader.SizeOfImage as usize + 0xFFF) & !0xFFF;
-
-            // Describe the valid call target
-            let mut cfg = CFG_CALL_TARGET_INFO {
-                Flags: Self::CFG_CALL_TARGET_VALID,
-                Offset: function - module,
-            };
-
-            // Apply the new valid call target
-            if SetProcessValidCallTargets(
-                NtCurrentProcess(), 
-                module as *mut c_void, 
-                size, 
-                1, 
-                &mut cfg
-            ) == 0 
-            {
-                bail!(s!("SetProcessValidCallTargets Failed"))
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Registers known indirect call targets with Control Flow Guard (CFG).
-    ///
-    /// # Arguments
-    ///
-    /// * `cfg` - A reference to the resolved function configuration used by the loader.
-    pub fn enable(cfg: &Config) {
-        let targets = [(cfg.modules.ntdll, cfg.nt_continue)];
-        for (module, func) in targets {
-            if let Err(e) = Self::add(module.as_u64() as usize, func.as_u64() as usize) {
-                if cfg!(debug_assertions) {
-                    dinvk::println!("CFG::add failed: {e}");
-                }
+                dinvk::println!("[Hypnus::new] {:?}", _error);
             }
         }
     }
