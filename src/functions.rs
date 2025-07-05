@@ -4,7 +4,14 @@ use core::ffi::c_void;
 use spin::Once;
 use obfstr::obfstr as s;
 use dinvk::{GetModuleHandle, GetProcAddress};
-use dinvk::{data::*, hash::{murmur3, jenkins3}, get_ntdll_address};
+use dinvk::{
+    hash::{murmur3, jenkins3},
+    get_ntdll_address
+};
+use dinvk::data::{
+    HANDLE, EVENT_TYPE, NTSTATUS,
+    LARGE_INTEGER, STATUS_UNSUCCESSFUL
+};
 
 use crate::data::*;
 
@@ -13,32 +20,32 @@ static FUNCTIONS: Once<Functions> = Once::new();
 
 /// Structure containing all function pointers resolved only once.
 pub struct Functions {
-    pub NtSignalAndWaitForSingleObject: NtSignalAndWaitForSingleObjectType,
-    pub NtQueueApcThread: NtQueueApcThreadType,
-    pub NtAlertResumeThread: NtAlertResumeThreadType,
-    pub NtQueryInformationProcess: NtQueryInformationProcessType,
-    pub NtLockVirtualMemory: NtLockVirtualMemoryType,
-    pub NtDuplicateObject: NtDuplicateObjectType,
-    pub NtCreateEvent: NtCreateEventType,
-    pub NtWaitForSingleObject: NtWaitForSingleObjectType,
-    pub NtClose: NtCloseType,
-    pub TpAllocPool: TpAllocPoolType,
-    pub TpSetPoolStackInformation: TpSetPoolStackInformationType,
-    pub TpSetPoolMinThreads: TpSetPoolMinThreadsType,
-    pub TpSetPoolMaxThreads: TpSetPoolMaxThreadsType,
-    pub TpAllocTimer: TpAllocType,
-    pub TpSetTimer: TpSetTimerType,
-    pub TpAllocWait: TpAllocType,
-    pub TpSetWait: TpSetWaitType,
-    pub NtSetEvent: NtSetEventType,
-    pub CloseThreadpool: CloseThreadpoolType,
-    pub RtlWalkHeap: RtlWalkHeapType,
-    pub SetProcessValidCallTargets: SetProcessValidCallTargetsType,
-    pub ConvertFiberToThread: ConvertFiberToThreadType,
-    pub ConvertThreadToFiber: ConvertThreadToFiberType,
-    pub CreateFiber: CreateFiberType,
-    pub DeleteFiber: DeleteFiberType,
-    pub SwitchToFiber: SwitchToFiberType,
+    pub NtSignalAndWaitForSingleObject: NtSignalAndWaitForSingleObjectFn,
+    pub NtQueueApcThread: NtQueueApcThreadFn,
+    pub NtAlertResumeThread: NtAlertResumeThreadFn,
+    pub NtQueryInformationProcess: NtQueryInformationProcessFn,
+    pub NtLockVirtualMemory: NtLockVirtualMemoryFn,
+    pub NtDuplicateObject: NtDuplicateObjectFn,
+    pub NtCreateEvent: NtCreateEventFn,
+    pub NtWaitForSingleObject: NtWaitForSingleObjectFn,
+    pub NtClose: NtCloseFn,
+    pub TpAllocPool: TpAllocPoolFn,
+    pub TpSetPoolStackInformation: TpSetPoolStackInformationFn,
+    pub TpSetPoolMinThreads: TpSetPoolMinThreadsFn,
+    pub TpSetPoolMaxThreads: TpSetPoolMaxThreadsFn,
+    pub TpAllocTimer: TpAllocFn,
+    pub TpSetTimer: TpSetTimerFn,
+    pub TpAllocWait: TpAllocFn,
+    pub TpSetWait: TpSetWaitFn,
+    pub NtSetEvent: NtSetEventFn,
+    pub CloseThreadpool: CloseThreadpoolFn,
+    pub RtlWalkHeap: RtlWalkHeapFn,
+    pub SetProcessValidCallTargets: SetProcessValidCallTargetsFn,
+    pub ConvertFiberToThread: ConvertFiberToThreadFn,
+    pub ConvertThreadToFiber: ConvertThreadToFiberFn,
+    pub CreateFiber: CreateFiberFn,
+    pub DeleteFiber: DeleteFiberFn,
+    pub SwitchToFiber: SwitchToFiberFn,
 }
 
 /// Returns a reference to the resolved functions structure.
@@ -108,7 +115,15 @@ pub fn NtCreateEvent(
     EventType: EVENT_TYPE,
     InitialState: u8,
 ) -> NTSTATUS {
-    unsafe { (functions().NtCreateEvent)(EventHandle, DesiredAccess, ObjectAttributes, EventType, InitialState) }
+    unsafe { 
+        (functions().NtCreateEvent)(
+            EventHandle, 
+            DesiredAccess, 
+            ObjectAttributes, 
+            EventType, 
+            InitialState
+        ) 
+    }
 }
 
 /// Wrapper for the `NtDuplicateObject` API.
@@ -155,21 +170,21 @@ pub fn NtLockVirtualMemory(
 
 /// Wrapper for the `NtAllocateVirtualMemory` API.
 pub fn NtAllocateVirtualMemory(
-    process_handle: HANDLE,
-    base_address: *mut *mut c_void,
-    zero_bits: usize,
-    region_size: *mut usize,
-    allocation_type: u32,
-    protect: u32,
+    ProcessHandle: HANDLE,
+    BaseAddress: *mut *mut c_void,
+    ZeroBits: usize,
+    RegionSize: *mut usize,
+    AllocationType: u32,
+    Protect: u32,
 ) -> NTSTATUS {
     match uwd::syscall!(
         s!("NtAllocateVirtualMemory"),
-        process_handle,
-        base_address,
-        zero_bits,
-        region_size,
-        allocation_type,
-        protect
+        ProcessHandle,
+        BaseAddress,
+        ZeroBits,
+        RegionSize,
+        AllocationType,
+        Protect
     ) {
         Ok(ret) => ret as NTSTATUS,
         Err(_) => STATUS_UNSUCCESSFUL,
@@ -178,19 +193,19 @@ pub fn NtAllocateVirtualMemory(
 
 /// Wrapper for the `NtProtectVirtualMemory` API.
 pub fn NtProtectVirtualMemory(
-    process_handle: *mut c_void,
-    base_address: *mut *mut c_void,
-    region_size: *mut usize,
-    new_protect: u32,
-    old_protect: *mut u32,
+    ProcessHandle: *mut c_void,
+    BaseAddress: *mut *mut c_void,
+    RegionSize: *mut usize,
+    NewProtect: u32,
+    OldProtect: *mut u32,
 ) -> NTSTATUS {
     match uwd::syscall!(
         s!("NtProtectVirtualMemory"), 
-        process_handle, 
-        base_address, 
-        region_size, 
-        new_protect, 
-        old_protect
+        ProcessHandle, 
+        BaseAddress, 
+        RegionSize, 
+        NewProtect, 
+        OldProtect
     ) {
         Ok(ret) => ret as NTSTATUS,
         Err(_) => STATUS_UNSUCCESSFUL,
@@ -232,7 +247,15 @@ pub fn NtQueueApcThread(
     ApcArgument2: *mut c_void,
     ApcArgument3: *mut c_void,
 ) -> NTSTATUS {
-    unsafe { (functions().NtQueueApcThread)(ThreadHandle, ApcRoutine, ApcArgument1, ApcArgument2, ApcArgument3) }
+    unsafe { 
+        (functions().NtQueueApcThread)(
+            ThreadHandle, 
+            ApcRoutine, 
+            ApcArgument1, 
+            ApcArgument2, 
+            ApcArgument3
+        ) 
+    }
 }
 
 /// Wrapper for the `NtSignalAndWaitForSingleObject` API.
@@ -243,7 +266,14 @@ pub fn NtSignalAndWaitForSingleObject(
     Alertable: u8, 
     Timeout: *mut LARGE_INTEGER
 ) -> NTSTATUS {
-    unsafe { (functions().NtSignalAndWaitForSingleObject)(SignalHandle, WaitHandle, Alertable, Timeout) }
+    unsafe { 
+        (functions().NtSignalAndWaitForSingleObject)(
+            SignalHandle, 
+            WaitHandle, 
+            Alertable, 
+            Timeout
+        ) 
+    }
 }
 
 /// Wrapper for the `TpAllocPool` API.
@@ -254,7 +284,10 @@ pub fn TpAllocPool(PoolReturn: *mut *mut c_void, Reserved: *mut c_void) -> NTSTA
 
 /// Wrapper for the `TpSetPoolStackInformation` API.
 #[inline(always)]
-pub fn TpSetPoolStackInformation(Pool: *mut c_void, PoolStackInformation: *mut TP_POOL_STACK_INFORMATION) -> NTSTATUS {
+pub fn TpSetPoolStackInformation(
+    Pool: *mut c_void, 
+    PoolStackInformation: *mut TP_POOL_STACK_INFORMATION
+) -> NTSTATUS {
     unsafe { (functions().TpSetPoolStackInformation)(Pool, PoolStackInformation) }
 }
 
@@ -283,8 +316,15 @@ pub fn TpAllocTimer(
 
 /// Wrapper for the `TpSetTimer` API.
 #[inline(always)]
-pub fn TpSetTimer(Timer: *mut c_void, DueTime: *mut LARGE_INTEGER, Period: u32, WindowLength: u32) {
-    unsafe { (functions().TpSetTimer)(Timer, DueTime, Period, WindowLength) }
+pub fn TpSetTimer(
+    Timer: *mut c_void, 
+    DueTime: *mut LARGE_INTEGER, 
+    Period: u32, 
+    WindowLength: u32
+) {
+    unsafe { 
+        (functions().TpSetTimer)(Timer, DueTime, Period, WindowLength) 
+    }
 }
 
 /// Wrapper for the `TpAllocWait` API.
@@ -355,13 +395,7 @@ pub fn CreateFiber(
     lpStartAddress: LPFIBER_START_ROUTINE, 
     lpParameter: *const c_void
 ) -> *mut c_void {
-    unsafe { 
-        (functions().CreateFiber)(
-            dwStackSize, 
-            lpStartAddress, 
-            lpParameter
-        ) 
-    }
+    unsafe { (functions().CreateFiber)(dwStackSize, lpStartAddress, lpParameter) }
 }
 
 /// Wrapper for the `DeleteFiber` API.

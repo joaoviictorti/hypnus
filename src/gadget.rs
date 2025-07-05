@@ -1,10 +1,9 @@
 use alloc::vec::Vec;
 use core::ffi::c_void;
 
+use dinvk::{parse::PE, shuffle};
 use dinvk::{
     data::{CONTEXT, IMAGE_RUNTIME_FUNCTION},
-    parse::PE,
-    shuffle,
 };
 
 use crate::config::Config;
@@ -115,7 +114,10 @@ impl Gadget {
     /// # Returns
     ///
     /// * A list of `Gadget` instances, one per register if available.
-    fn find<B: ?Sized + AsRef<[u8]>>(base: *const u8, region: &B) -> Vec<Gadget> {
+    fn find<B>(base: *const u8, region: &B) -> Vec<Gadget> 
+    where
+        B: ?Sized + AsRef<[u8]>,
+    {
         let mut gadgets = Vec::new();
         let mut seen = [false; JMP_GADGETS.len()];
         for (i, (pattern, reg)) in JMP_GADGETS.iter().enumerate() {
@@ -153,11 +155,10 @@ impl Gadget {
     /// # Returns
     ///
     /// * An optional tuple of (address, frame_size) for a usable gadget.
-    pub fn scan_runtime<B: ?Sized + AsRef<[u8]>>(
-        module: *mut c_void,
-        pattern: &B,
-        runtime_table: &[IMAGE_RUNTIME_FUNCTION],
-    ) -> Option<(*mut u8, u32)> {
+    pub fn scan_runtime<B>(module: *mut c_void, pattern: &B, runtime_table: &[IMAGE_RUNTIME_FUNCTION]) -> Option<(*mut u8, u32)>
+    where
+        B: ?Sized + AsRef<[u8]>,
+    {
         unsafe {
             let mut gadgets = Vec::new();
 

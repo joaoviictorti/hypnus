@@ -93,10 +93,14 @@ impl GadgetKind {
             .context(s!("Failed to read IMAGE_RUNTIME_FUNCTION entries from .pdata section"))?;
 
         match self {
-            GadgetKind::Call => Gadget::scan_runtime(cfg.modules.kernelbase.as_ptr(), &[0xFF, 0x13], tables)
-                .context(s!("Missing call [rbx] gadget")),
-            GadgetKind::Jmp => Gadget::scan_runtime(cfg.modules.kernelbase.as_ptr(), &[0xFF, 0x23], tables)
-                .context(s!("Missing jmp [rbx] gadget")),
+            GadgetKind::Call => {
+                Gadget::scan_runtime(cfg.modules.kernelbase.as_ptr(), &[0xFF, 0x13], tables)
+                    .context(s!("Missing call [rbx] gadget"))
+            }
+            GadgetKind::Jmp => {
+                Gadget::scan_runtime(cfg.modules.kernelbase.as_ptr(), &[0xFF, 0x23], tables)
+                    .context(s!("Missing jmp [rbx] gadget"))
+            }
         }
     }
 

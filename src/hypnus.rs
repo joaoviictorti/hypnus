@@ -5,13 +5,15 @@ use uwd::AsUwd;
 use anyhow::{Result, bail};
 use obfstr::{obfstr as obf, obfstring as s};
 use dinvk::{NtCurrentProcess, NtCurrentThread};
-use dinvk::data::*;
+use dinvk::data::{
+    NT_SUCCESS, LARGE_INTEGER, CONTEXT,
+    EVENT_ALL_ACCESS, EVENT_TYPE, NTSTATUS
+};
 
+use crate::{data::*, functions::*};
 use crate::{
     allocator::HypnusHeap,
     config::{Config, init_config},
-    data::*,
-    functions::*,
     gadget::GadgetContext,
 };
 
@@ -26,7 +28,13 @@ use crate::{
 #[macro_export]
 macro_rules! timer {
     ($base:expr, $size:expr, $time:expr) => {
-        $crate::internal::hypnus_entry($base, $size, $time, $crate::Obfuscation::Timer, $crate::ObfMode::None)
+        $crate::internal::hypnus_entry(
+            $base, 
+            $size, 
+            $time, 
+            $crate::Obfuscation::Timer, 
+            $crate::ObfMode::None
+        )
     };
 
     ($base:expr, $size:expr, $time:expr, $mode:expr) => {
@@ -45,7 +53,13 @@ macro_rules! timer {
 #[macro_export]
 macro_rules! wait {
     ($base:expr, $size:expr, $time:expr) => {
-        $crate::internal::hypnus_entry($base, $size, $time, $crate::Obfuscation::Wait, $crate::ObfMode::None)
+        $crate::internal::hypnus_entry(
+            $base, 
+            $size, 
+            $time, 
+            $crate::Obfuscation::Wait, 
+            $crate::ObfMode::None
+        )
     };
 
     ($base:expr, $size:expr, $time:expr, $mode:expr) => {
@@ -64,7 +78,13 @@ macro_rules! wait {
 #[macro_export]
 macro_rules! foliage {
     ($base:expr, $size:expr, $time:expr) => {
-        $crate::internal::hypnus_entry($base, $size, $time, $crate::Obfuscation::Foliage, $crate::ObfMode::None)
+        $crate::internal::hypnus_entry(
+            $base, 
+            $size, 
+            $time, 
+            $crate::Obfuscation::Foliage, 
+            $crate::ObfMode::None
+        )
     };
 
     ($base:expr, $size:expr, $time:expr, $mode:expr) => {

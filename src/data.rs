@@ -114,29 +114,145 @@ pub struct CFG_CALL_TARGET_INFO {
     pub Flags: usize,
 }
 
+/// Fiber entry function
 pub type LPFIBER_START_ROUTINE = Option<unsafe extern "system" fn(lpFiberParameter: *mut c_void)>;
-pub type ConvertFiberToThreadType = unsafe extern "system" fn() -> i32;
-pub type NtCloseType = unsafe extern "system" fn(Handle: HANDLE) -> NTSTATUS;
-pub type SwitchToFiberType = unsafe extern "system" fn(lpFiber: *mut c_void);
-pub type DeleteFiberType = unsafe extern "system" fn(lpFiber: *mut c_void);
-pub type CloseThreadpoolType = unsafe extern "system" fn(Pool: *mut c_void) -> NTSTATUS;
-pub type TpSetPoolMaxThreadsType = unsafe extern "system" fn(Pool: *mut c_void, MaxThreads: u32);
-pub type NtSetEventType = unsafe extern "system" fn(hEvent: *mut c_void, PreviousState: *mut i32) -> NTSTATUS;
-pub type ConvertThreadToFiberType = unsafe extern "system" fn(lpParameter: *mut c_void) -> *mut c_void;
-pub type TpSetPoolMinThreadsType = unsafe extern "system" fn(Pool: *mut c_void, MinThreads: u32) -> NTSTATUS;
-pub type TpSetWaitType = unsafe extern "system" fn(Wait: *mut c_void, Handle: *mut c_void, Timeout: *mut LARGE_INTEGER);
-pub type TpAllocPoolType = unsafe extern "system" fn(PoolReturn: *mut *mut c_void, Reserved: *mut c_void) -> NTSTATUS;
-pub type RtlWalkHeapType = unsafe extern "system" fn(HeapHandle: *mut c_void, Entry: *mut RTL_HEAP_WALK_ENTRY) -> NTSTATUS;
-pub type NtWaitForSingleObjectType = unsafe extern "system" fn(Handle: HANDLE, Alertable: u8, Timeout: *mut i32) -> NTSTATUS;
-pub type NtAlertResumeThreadType = unsafe extern "system" fn(ThreadHandle: HANDLE, PreviousSuspendCount: *mut u32) -> NTSTATUS;
-pub type TpSetTimerType = unsafe extern "system" fn(Timer: *mut c_void, DueTime: *mut LARGE_INTEGER, Period: u32, WindowLength: u32);
-pub type TpAllocType = unsafe extern "system" fn(Timer: *mut *mut c_void, Callback: *mut c_void, Context: *mut c_void, CallbackEnviron: *mut TP_CALLBACK_ENVIRON_V3) -> NTSTATUS;
-pub type TpSetPoolStackInformationType = unsafe extern "system" fn(Pool: *mut c_void, PoolStackInformation: *mut TP_POOL_STACK_INFORMATION) -> NTSTATUS;
-pub type CreateFiberType = unsafe extern "system" fn(dwStackSize: usize, lpStartAddress: LPFIBER_START_ROUTINE, lpParameter: *const c_void) -> *mut c_void;
-pub type NtSignalAndWaitForSingleObjectType = unsafe extern "system" fn(SignalHandle: HANDLE, WaitHandle: HANDLE, Alertable: u8, Timeout: *mut LARGE_INTEGER) -> NTSTATUS;
-pub type NtQueueApcThreadType = unsafe extern "system" fn(ThreadHandle: HANDLE, ApcRoutine: *mut c_void, ApcArgument1: *mut c_void, ApcArgument2: *mut c_void, ApcArgument3: *mut c_void) -> NTSTATUS;
-pub type NtQueryInformationProcessType = unsafe extern "system" fn(ProcessHandle: HANDLE, ProcessInformationClass: u32, ProcessInformation: *mut c_void, ProcessInformationLength: u32, ReturnLength: *mut u32) -> NTSTATUS;
-pub type NtLockVirtualMemoryType = unsafe extern "system" fn(ProcessHandle: HANDLE, BaseAddress: *mut *mut c_void, RegionSize: *mut usize, MapType: u32) -> NTSTATUS;
-pub type NtDuplicateObjectType = unsafe extern "system" fn(SourceProcessHandle: HANDLE, SourceHandle: HANDLE, TargetProcessHandle: HANDLE, TargetHandle: *mut HANDLE, DesiredAccess: u32, HandleAttributes: u32, Options: u32) -> NTSTATUS;
-pub type NtCreateEventType = unsafe extern "system" fn(EventHandle: *mut HANDLE, DesiredAccess: u32, ObjectAttributes: *mut c_void, EventType: EVENT_TYPE, InitialState: u8) -> NTSTATUS;
-pub type SetProcessValidCallTargetsType = unsafe extern "system" fn(hProcess: HANDLE, VirtualAddress: *mut c_void, RegionSize: usize, NumberOfOffsets: u32, OffsetInformation: *mut CFG_CALL_TARGET_INFO) -> u8;
+
+/// Fiber
+pub type ConvertThreadToFiberFn = unsafe extern "system" fn(lpParameter: *mut c_void) -> *mut c_void;
+pub type ConvertFiberToThreadFn = unsafe extern "system" fn() -> i32;
+pub type SwitchToFiberFn = unsafe extern "system" fn(lpFiber: *mut c_void);
+pub type DeleteFiberFn = unsafe extern "system" fn(lpFiber: *mut c_void);
+pub type CreateFiberFn = unsafe extern "system" fn(
+    dwStackSize: usize,
+    lpStartAddress: LPFIBER_START_ROUTINE,
+    lpParameter: *const c_void,
+) -> *mut c_void;
+
+/// Pool Threads
+pub type TpAllocFn = unsafe extern "system" fn(
+    Timer: *mut *mut c_void,
+    Callback: *mut c_void,
+    Context: *mut c_void,
+    CallbackEnviron: *mut TP_CALLBACK_ENVIRON_V3,
+) -> NTSTATUS;
+
+pub type TpAllocPoolFn = unsafe extern "system" fn(
+    PoolReturn: *mut *mut c_void,
+    Reserved: *mut c_void,
+) -> NTSTATUS;
+
+pub type TpSetPoolMaxThreadsFn = unsafe extern "system" fn(
+    Pool: *mut c_void,
+    MaxThreads: u32,
+);
+
+pub type TpSetPoolMinThreadsFn = unsafe extern "system" fn(
+    Pool: *mut c_void,
+    MinThreads: u32,
+) -> NTSTATUS;
+
+pub type TpSetPoolStackInformationFn = unsafe extern "system" fn(
+    Pool: *mut c_void,
+    PoolStackInformation: *mut TP_POOL_STACK_INFORMATION,
+) -> NTSTATUS;
+
+pub type TpSetWaitFn = unsafe extern "system" fn(
+    Wait: *mut c_void,
+    Handle: *mut c_void,
+    Timeout: *mut LARGE_INTEGER,
+);
+
+pub type TpSetTimerFn = unsafe extern "system" fn(
+    Timer: *mut c_void,
+    DueTime: *mut LARGE_INTEGER,
+    Period: u32,
+    WindowLength: u32,
+);
+
+pub type CloseThreadpoolFn = unsafe extern "system" fn(
+    Pool: *mut c_void,
+) -> NTSTATUS;
+
+/// NTAPIs
+pub type NtCloseFn = unsafe extern "system" fn(
+    Handle: HANDLE,
+) -> NTSTATUS;
+
+pub type NtCreateEventFn = unsafe extern "system" fn(
+    EventHandle: *mut HANDLE,
+    DesiredAccess: u32,
+    ObjectAttributes: *mut c_void,
+    EventType: EVENT_TYPE,
+    InitialState: u8,
+) -> NTSTATUS;
+
+pub type NtSetEventFn = unsafe extern "system" fn(
+    hEvent: *mut c_void,
+    PreviousState: *mut i32,
+) -> NTSTATUS;
+
+pub type NtWaitForSingleObjectFn = unsafe extern "system" fn(
+    Handle: HANDLE,
+    Alertable: u8,
+    Timeout: *mut i32,
+) -> NTSTATUS;
+
+pub type NtSignalAndWaitForSingleObjectFn = unsafe extern "system" fn(
+    SignalHandle: HANDLE,
+    WaitHandle: HANDLE,
+    Alertable: u8,
+    Timeout: *mut LARGE_INTEGER,
+) -> NTSTATUS;
+
+pub type NtAlertResumeThreadFn = unsafe extern "system" fn(
+    ThreadHandle: HANDLE,
+    PreviousSuspendCount: *mut u32,
+) -> NTSTATUS;
+
+pub type NtQueueApcThreadFn = unsafe extern "system" fn(
+    ThreadHandle: HANDLE,
+    ApcRoutine: *mut c_void,
+    ApcArgument1: *mut c_void,
+    ApcArgument2: *mut c_void,
+    ApcArgument3: *mut c_void,
+) -> NTSTATUS;
+
+pub type NtQueryInformationProcessFn = unsafe extern "system" fn(
+    ProcessHandle: HANDLE,
+    ProcessInformationClass: u32,
+    ProcessInformation: *mut c_void,
+    ProcessInformationLength: u32,
+    ReturnLength: *mut u32,
+) -> NTSTATUS;
+
+pub type NtDuplicateObjectFn = unsafe extern "system" fn(
+    SourceProcessHandle: HANDLE,
+    SourceHandle: HANDLE,
+    TargetProcessHandle: HANDLE,
+    TargetHandle: *mut HANDLE,
+    DesiredAccess: u32,
+    HandleAttributes: u32,
+    Options: u32,
+) -> NTSTATUS;
+
+pub type NtLockVirtualMemoryFn = unsafe extern "system" fn(
+    ProcessHandle: HANDLE,
+    BaseAddress: *mut *mut c_void,
+    RegionSize: *mut usize,
+    MapType: u32,
+) -> NTSTATUS;
+
+/// Heap
+pub type RtlWalkHeapFn = unsafe extern "system" fn(
+    HeapHandle: *mut c_void,
+    Entry: *mut RTL_HEAP_WALK_ENTRY,
+) -> NTSTATUS;
+
+/// CFG Protections
+pub type SetProcessValidCallTargetsFn = unsafe extern "system" fn(
+    hProcess: HANDLE,
+    VirtualAddress: *mut c_void,
+    RegionSize: usize,
+    NumberOfOffsets: u32,
+    OffsetInformation: *mut CFG_CALL_TARGET_INFO,
+) -> u8;

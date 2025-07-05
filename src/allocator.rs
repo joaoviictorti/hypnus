@@ -36,7 +36,10 @@ impl HypnusHeap {
 
     /// Returns the handle to the default process heap.
     pub fn heap() -> HANDLE {
-        unsafe { HEAP_HANDLE.map(|p| p.as_ptr()).unwrap_or_else(Self::create) }
+        unsafe { 
+            HEAP_HANDLE.map(|p| p.as_ptr())
+                .unwrap_or_else(Self::create) 
+        }
     }
 }
 
@@ -84,4 +87,11 @@ unsafe impl GlobalAlloc for HypnusHeap {
 
 link!("ntdll" "system" fn RtlFreeHeap(heap: HANDLE, flags: u32, ptr: *mut c_void) -> i8);
 link!("ntdll" "system" fn RtlAllocateHeap(heap: HANDLE, flags: u32, size: usize) -> *mut c_void);
-link!("ntdll" "system" fn RtlCreateHeap(flags: u32, heap_base: *mut c_void, reserve_size: usize, commit_size: usize, lock: *mut c_void, parameters: *mut c_void) -> HANDLE);
+link!("ntdll" "system" fn RtlCreateHeap(
+    flags: u32, 
+    heap_base: *mut c_void, 
+    reserve_size: usize, 
+    commit_size: usize, 
+    lock: *mut c_void, 
+    parameters: *mut c_void
+) -> HANDLE);
