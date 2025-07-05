@@ -3,7 +3,7 @@
 
 extern crate alloc;
 
-use hypnus::{apc, ObfMode, HypnusHeap};
+use hypnus::{foliage, ObfMode, HypnusHeap};
 use core::ffi::c_void;
 
 #[unsafe(no_mangle)]
@@ -18,7 +18,7 @@ fn main() -> u8 {
 
     loop {
         // Full obfuscation with heap encryption and RWX memory protection
-        apc!(ptr, size, delay, ObfMode::Heap | ObfMode::Rwx);
+        foliage!(ptr, size, delay, ObfMode::Heap | ObfMode::Rwx);
     }
 }
 
