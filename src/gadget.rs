@@ -155,7 +155,11 @@ impl Gadget {
     /// # Returns
     ///
     /// * An optional tuple of (address, frame_size) for a usable gadget.
-    pub fn scan_runtime<B>(module: *mut c_void, pattern: &B, runtime_table: &[IMAGE_RUNTIME_FUNCTION]) -> Option<(*mut u8, u32)>
+    pub fn scan_runtime<B>(
+        module: *mut c_void, 
+        pattern: &B, 
+        runtime_table: &[IMAGE_RUNTIME_FUNCTION]
+    ) -> Option<(*mut u8, u32)>
     where
         B: ?Sized + AsRef<[u8]>,
     {

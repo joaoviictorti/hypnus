@@ -973,11 +973,11 @@ pub mod internal {
     ///
     /// # Arguments
     ///
-    /// - `base` - Memory region to encrypt/decrypt.
-    /// - `size` - Size of the memory region in bytes.
-    /// - `time` - Time (in seconds) to wait before decrypting/resuming.
-    /// - `obf` - Chosen obfuscation strategy.
-    /// - `mode` - Optional [`ObfMode`] for stack/heap layout changes.
+    /// * `base` - Memory region to encrypt/decrypt.
+    /// * `size` - Size of the memory region in bytes.
+    /// * `time` - Time (in seconds) to wait before decrypting/resuming.
+    /// * `obf` - Chosen obfuscation strategy.
+    /// * `mode` - Optional [`ObfMode`] for stack/heap layout changes.
     pub fn hypnus_entry(base: *mut c_void, size: u64, time: u64, obf: Obfuscation, mode: ObfMode) {
         // Converts the current thread to a fiber so we can switch to another fiber manually.
         let master = ConvertThreadToFiber(null_mut());

@@ -5,6 +5,12 @@
 
 extern crate alloc;
 
+mod config;
+mod data;
+mod functions;
+mod gadget;
+mod stack;
+
 /// Responsible for memory obfuscation
 mod hypnus;
 pub use hypnus::*;
@@ -12,9 +18,3 @@ pub use hypnus::*;
 /// Custom allocator for use in Heap Obfuscation
 mod allocator;
 pub use allocator::*;
-
-mod config;
-mod data;
-mod functions;
-mod gadget;
-mod stack;
