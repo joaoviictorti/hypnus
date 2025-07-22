@@ -3,6 +3,7 @@ use core::ffi::c_void;
 
 use spin::Once;
 use obfstr::obfstr as s;
+use uwd::syscall_synthetic as syscall;
 use dinvk::{GetModuleHandle, GetProcAddress};
 use dinvk::{
     hash::{murmur3, jenkins3},
@@ -177,7 +178,7 @@ pub fn NtAllocateVirtualMemory(
     AllocationType: u32,
     Protect: u32,
 ) -> NTSTATUS {
-    match uwd::syscall!(
+    match syscall!(
         s!("NtAllocateVirtualMemory"),
         ProcessHandle,
         BaseAddress,
@@ -199,7 +200,7 @@ pub fn NtProtectVirtualMemory(
     NewProtect: u32,
     OldProtect: *mut u32,
 ) -> NTSTATUS {
-    match uwd::syscall!(
+    match syscall!(
         s!("NtProtectVirtualMemory"), 
         ProcessHandle, 
         BaseAddress, 
