@@ -766,7 +766,7 @@ impl Hypnus {
 
             // Create a new thread in suspended state for APC injection
             let mut h_thread = null_mut::<c_void>();
-            status = uwd::syscall!(
+            status = uwd::syscall_synthetic!(
                 obf!("NtCreateThreadEx"),
                 h_thread.as_uwd_mut(),
                 THREAD_ALL_ACCESS,
