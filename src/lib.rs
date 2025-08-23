@@ -15,46 +15,43 @@
 //! ## Examples
 //!
 //! ### Sleep Obfuscation via ThreadPool Timer
-//! ```no_run
+//! ```rust,no_run
 //! use hypnus::timer;
 //! use core::ffi::c_void;
 //!
-//! fn main() {
-//!     let ptr = 0x13370000 as *mut c_void;
-//!     let size = 512;
-//!     let delay = 5;
-//!     timer!(ptr, size, delay);
-//! }
+//! let ptr = 0x13370000 as *mut c_void;
+//! let size = 512;
+//! let delay = 5;
+//!
+//! timer!(ptr, size, delay);
 //! ```
 //!
 //! ### Sleep Obfuscation via ThreadPool Wait
-//! ```no_run
+//! ```rust,no_run
 //! use hypnus::wait;
 //! use core::ffi::c_void;
 //!
-//! fn main() {
-//!     let ptr = 0x13370000 as *mut c_void;
-//!     let size = 512;
-//!     let delay = 5;
-//!     wait!(ptr, size, delay);
-//! }
+//! let ptr = 0x13370000 as *mut c_void;
+//! let size = 512;
+//! let delay = 5;
+//!
+//! wait!(ptr, size, delay);
 //! ```
 //!
 //! ### Sleep Obfuscation via APC (Foliage)
-//! ```no_run
+//! ```rust,no_run
 //! use hypnus::foliage;
 //! use core::ffi::c_void;
 //!
-//! fn main() {
-//!     let ptr = 0x13370000 as *mut c_void;
-//!     let size = 512;
-//!     let delay = 5;
-//!     foliage!(ptr, size, delay);
-//! }
+//! let ptr = 0x13370000 as *mut c_void;
+//! let size = 512;
+//! let delay = 5;
+//!
+//! foliage!(ptr, size, delay);
 //! ```
 //!
 //! ### Heap Obfuscation with RWX
-//! ```no_run
+//! ```rust,ignore
 //! #![no_std]
 //! #![no_main]
 //!
@@ -89,6 +86,7 @@
 //! For additional examples and usage, visit the [repository].
 //!
 //! [repository]: https://github.com/joaoviictorti/hypnus
+//!
 
 #![no_std]
 #![allow(
