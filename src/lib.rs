@@ -51,7 +51,7 @@
 //! ```
 //!
 //! ### Heap Obfuscation with RWX
-//! ```rust,ignore
+//! ```rust,no_run
 //! #![no_std]
 //! #![no_main]
 //!
@@ -86,7 +86,6 @@
 //! For additional examples and usage, visit the [repository].
 //!
 //! [repository]: https://github.com/joaoviictorti/hypnus
-//!
 
 #![no_std]
 #![allow(

@@ -4,7 +4,8 @@ use core::{
     ptr::{NonNull, null_mut},
 };
 
-use dinvk::{data::*, link};
+use dinvk::data::HANDLE;
+use super::data::HEAP_GROWABLE;
 
 /// Global handle to the custom heap used by `HypnusHeap`.
 static mut HEAP_HANDLE: Option<NonNull<c_void>> = None;
@@ -13,14 +14,11 @@ static mut HEAP_HANDLE: Option<NonNull<c_void>> = None;
 pub struct HypnusHeap;
 
 impl HypnusHeap {
-    /// Flag used to create a growable heap.
-    const HEAP_GROWABLE: u32 = 0x00000002;
-
     /// Initializes a new private heap using `RtlCreateHeap`.
     fn create() -> HANDLE {
         let handle = unsafe { 
             RtlCreateHeap(
-                Self::HEAP_GROWABLE, 
+                HEAP_GROWABLE, 
                 null_mut(), 
                 0, 
                 0, 
@@ -85,9 +83,9 @@ unsafe impl GlobalAlloc for HypnusHeap {
     }
 }
 
-link!("ntdll" "system" fn RtlFreeHeap(heap: HANDLE, flags: u32, ptr: *mut c_void) -> i8);
-link!("ntdll" "system" fn RtlAllocateHeap(heap: HANDLE, flags: u32, size: usize) -> *mut c_void);
-link!("ntdll" "system" fn RtlCreateHeap(
+windows_targets::link!("ntdll" "system" fn RtlFreeHeap(heap: HANDLE, flags: u32, ptr: *mut c_void) -> i8);
+windows_targets::link!("ntdll" "system" fn RtlAllocateHeap(heap: HANDLE, flags: u32, size: usize) -> *mut c_void);
+windows_targets::link!("ntdll" "system" fn RtlCreateHeap(
     flags: u32, 
     heap_base: *mut c_void, 
     reserve_size: usize, 

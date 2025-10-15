@@ -3,7 +3,7 @@ use core::ffi::c_void;
 
 use spin::Once;
 use obfstr::obfstr as s;
-use uwd::syscall_synthetic as syscall;
+use uwd::syscall;
 use dinvk::{GetModuleHandle, GetProcAddress};
 use dinvk::{
     hash::{murmur3, jenkins3},
@@ -14,7 +14,7 @@ use dinvk::data::{
     LARGE_INTEGER, STATUS_UNSUCCESSFUL
 };
 
-use crate::data::*;
+use super::data::*;
 
 /// One-time initialization of the structure with resolved pointers.
 static FUNCTIONS: Once<Functions> = Once::new();

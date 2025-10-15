@@ -6,13 +6,14 @@ use obfstr::obfstring as s;
 use anyhow::{Context, Result, bail};
 use dinvk::{
     NtCurrentProcess,
-    data::{CONTEXT, NT_SUCCESS},
-    parse::PE,
+    NT_SUCCESS,
+    data::CONTEXT,
+    pe::PE,
 };
 
-use crate::{config::Config, gadget::Gadget};
-use crate::{data::*, Obfuscation};
-use crate::functions::{
+use super::{config::Config, gadget::Gadget};
+use super::{data::*, Obfuscation};
+use super::functions::{
     NtAllocateVirtualMemory, 
     NtLockVirtualMemory, 
     NtProtectVirtualMemory
@@ -37,7 +38,7 @@ pub struct Stack {
     /// Stack frame size for `RtlAcquireSRWLockExclusive`.
     rlt_acquire_srw_size: u32,
 
-    /// Type of gadget (`call [rbx]` or `jmp [rbx]`)
+    /// Type of gadget (`call [rbx]` or `jmp [rbx]`).
     gadget: GadgetKind,
 }
 
@@ -61,8 +62,7 @@ impl GadgetKind {
     ///
     /// # Returns
     ///
-    /// * `Ok(GadgetKind)` - if a supported gadget is found.
-    /// * `Err` - if no matching gadget is located.
+    /// If a supported gadget is found.
     pub fn detect(base: *mut core::ffi::c_void) -> Result<Self> {
         let pe = PE::parse(base);
         let tables = pe.unwind().entries().context(s!("Failed to parse .pdata unwind info"))?;
@@ -126,15 +126,11 @@ impl GadgetKind {
 }
 
 impl Stack {
-    /// Create a new [`Stack`]
+    /// Create a new [`Stack`].
     ///
     /// # Arguments
     ///
     /// * `cfg` - A [`Config`] instance with loaded base addresses and function pointers.
-    ///
-    /// # Returns
-    ///
-    /// * A fully initialized [`Stack`] instance.
     #[inline(always)]
     pub fn new(cfg: &Config) -> Result<Self> {
         let mut stack = Self::alloc_memory(cfg)?;
@@ -146,7 +142,7 @@ impl Stack {
     ///
     /// # Returns
     ///
-    /// * Partially constructed [`Stack`] with memory in place.
+    /// Partially constructed [`Stack`] with memory in place.
     pub fn alloc_memory(cfg: &Config) -> Result<Self> {
         // Check that the algo module contains a gadget `call [rbx]` or `jmp [rbx]`
         let kind = GadgetKind::detect(cfg.modules.kernelbase.as_ptr())?;
@@ -221,7 +217,7 @@ impl Stack {
     ///
     /// # Returns
     ///
-    /// * Error if any unwind info is missing or frame size cannot be computed.
+    /// Error if any unwind info is missing or frame size cannot be computed.
     pub fn frames(&mut self, cfg: &Config) -> Result<()> {
         let pe_ntdll = PE::parse(cfg.modules.ntdll.as_ptr());
         let pe_kernel32 = PE::parse(cfg.modules.kernel32.as_ptr());
@@ -276,7 +272,7 @@ impl Stack {
     ///
     /// # Returns
     ///
-    /// * A [`CONTEXT`] with forged `RSP` and `RIP`, ready to be applied to a suspended thread.
+    /// A [`CONTEXT`] with forged `RSP` and `RIP`, ready to be applied to a suspended thread.
     #[inline(always)]
     pub fn spoof_context(&self, cfg: &Config, ctx: CONTEXT) -> CONTEXT {
         unsafe {
@@ -331,7 +327,7 @@ impl Stack {
     ///
     /// # Returns
     ///
-    /// * Returns `Ok(())` if the stack layout was applied successfully to all contexts.
+    /// If the stack layout was applied successfully to all contexts.
     pub fn spoof(&self, ctxs: &mut [CONTEXT], cfg: &Config, kind: Obfuscation) -> Result<()> {
         let pe_kernelbase = PE::parse(cfg.modules.kernelbase.as_ptr());
         let tables = pe_kernelbase.unwind().entries().context(s!(
@@ -346,7 +342,8 @@ impl Stack {
             cfg.modules.kernelbase.as_ptr(),
             &[0x48, 0x83, 0xC4, 0x58, 0xC3],
             tables
-        ).context(s!("Add RSP gadget not found"))?;
+        )
+        .context(s!("Add RSP gadget not found"))?;
 
         unsafe {
             for ctx in ctxs.iter_mut() {

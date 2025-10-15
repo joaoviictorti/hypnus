@@ -11,6 +11,7 @@ pub const CONTEXT_FULL: u32 = 0x00010007;
 pub const THREAD_ALL_ACCESS: u32 = 0x001F03FF;
 pub const DUPLICATE_SAME_ACCESS: u32 = 0x00000002;
 pub const VM_LOCK_1: u32 = 0x0001;
+pub const HEAP_GROWABLE: u32 = 0x00000002;
 
 #[repr(C)]
 #[derive(Default, Clone, Copy)]

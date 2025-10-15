@@ -4,14 +4,14 @@ use core::{ffi::c_void, ptr::null_mut};
 use obfstr::{obfbytes as b, obfstring as s};
 use anyhow::{Context, Result, bail};
 use dinvk::{
-    data::NT_SUCCESS,
-    parse::PE,
+    NT_SUCCESS,
+    pe::PE,
     hash::{jenkins3, murmur3},
     *,
 };
 
-use crate::{data::*, stack::Stack};
-use crate::functions::{
+use super::{data::*, stack::Stack};
+use super::functions::{
     NtAllocateVirtualMemory, 
     NtLockVirtualMemory, 
     NtProtectVirtualMemory,
@@ -21,7 +21,7 @@ use crate::functions::{
 
 /// Lazily initializes and returns a singleton [`Config`] instance.
 #[inline(always)]
-pub fn init_config() -> anyhow::Result<&'static Config> {
+pub fn init_config() -> Result<&'static Config> {
     CONFIG.try_call_once(Config::new)
 }
 
@@ -88,8 +88,8 @@ pub struct Modules {
 
 impl Config {
     /// Create a new [`Config`].
-    pub fn new() -> anyhow::Result<Self> {
-        // Resolve module base addresses (ntdll, kernel32, cryptbase, etc.)
+    pub fn new() -> Result<Self> {
+        // Resolve module base addresses
         let modules = Self::modules();
 
         // Resolve hashed function addresses for all required APIs
@@ -243,15 +243,15 @@ impl Config {
         }
     }
 
-    /// Resolves hashed API function addresses using [`GetProcAddress`] and populates the [`Config`] fields.
+    /// Resolves hashed API function addresses using [`GetProcAddress`].
     ///
     /// # Arguments
     ///
-    /// * `modules` - A [`Modules`] struct containing base addresses for `ntdll.dll`, `kernel32.dll`, and `cryptbase.dll`.
+    /// * `modules` - A [`Modules`] struct containing base addresses.
     ///
     /// # Returns
     ///
-    /// * A [`Config`] struct with resolved function pointers (without stack info).
+    /// A [`Config`] struct with resolved function pointers (without stack info).
     fn functions(modules: Modules) -> Self {
         let ntdll = modules.ntdll.as_ptr();
         let kernel32 = modules.kernel32.as_ptr();
@@ -302,7 +302,7 @@ impl Cfg {
     ///
     /// # Returns
     ///
-    /// * `Ok(true)` if CFG is enforced, `Ok(false)` if not, or an error if the query fails.
+    /// If CFG is enforced.
     pub fn is_enabled() -> Result<bool> {
         let mut proc_info = EXTENDED_PROCESS_INFORMATION {
             ExtendedProcessInfo: Self::ProcessControlFlowGuardPolicy as u32,

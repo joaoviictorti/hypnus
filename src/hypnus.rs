@@ -1,17 +1,17 @@
 use alloc::string::String;
 use core::{ffi::c_void, mem::zeroed, ptr::null_mut};
 
-use uwd::AsUwd;
+use uwd::AsPointer;
 use anyhow::{Result, bail};
 use obfstr::{obfstr as obf, obfstring as s};
-use dinvk::{NtCurrentProcess, NtCurrentThread};
+use dinvk::{NtCurrentProcess, NtCurrentThread, NT_SUCCESS};
 use dinvk::data::{
-    NT_SUCCESS, LARGE_INTEGER, CONTEXT,
+    LARGE_INTEGER, CONTEXT,
     EVENT_ALL_ACCESS, EVENT_TYPE, NTSTATUS
 };
 
-use crate::{data::*, functions::*};
-use crate::{
+use super::{data::*, functions::*};
+use super::{
     allocator::HypnusHeap,
     config::{Config, init_config},
     gadget::GadgetContext,
@@ -24,7 +24,7 @@ use crate::{
 /// * `$base` - Base address of the memory region to encrypt/decrypt.
 /// * `$size` - Size (in bytes) of the memory region.
 /// * `$time` - Delay in seconds before resuming execution.
-/// * `$mode` *(optional)* - Obfuscation mode (e.g., stack spoofing or context modification).
+/// * `$mode` - Obfuscation mode.
 #[macro_export]
 macro_rules! timer {
     ($base:expr, $size:expr, $time:expr) => {
@@ -38,7 +38,13 @@ macro_rules! timer {
     };
 
     ($base:expr, $size:expr, $time:expr, $mode:expr) => {
-        $crate::internal::hypnus_entry($base, $size, $time, $crate::Obfuscation::Timer, $mode)
+        $crate::internal::hypnus_entry(
+            $base, 
+            $size, 
+            $time, 
+            $crate::Obfuscation::Timer, 
+            $mode
+        )
     };
 }
 
@@ -49,7 +55,7 @@ macro_rules! timer {
 /// * `$base` - Base address of the memory region to encrypt/decrypt.
 /// * `$size` - Size (in bytes) of the memory region.
 /// * `$time` - Delay in seconds before resuming execution.
-/// * `$mode` *(optional)* - Obfuscation mode (e.g., stack spoofing or context modification).
+/// * `$mode` - Obfuscation mode.
 #[macro_export]
 macro_rules! wait {
     ($base:expr, $size:expr, $time:expr) => {
@@ -63,7 +69,13 @@ macro_rules! wait {
     };
 
     ($base:expr, $size:expr, $time:expr, $mode:expr) => {
-        $crate::internal::hypnus_entry($base, $size, $time, $crate::Obfuscation::Wait, $mode)
+        $crate::internal::hypnus_entry(
+            $base, 
+            $size, 
+            $time, 
+            $crate::Obfuscation::Wait, 
+            $mode
+        )
     };
 }
 
@@ -74,7 +86,7 @@ macro_rules! wait {
 /// * `$base` - Base address of the memory region to encrypt/decrypt.
 /// * `$size` - Size (in bytes) of the memory region.
 /// * `$time` - Delay in seconds before resuming execution.
-/// * `$mode` *(optional)* - Obfuscation mode (e.g., stack spoofing or context modification).
+/// * `$mode` - Obfuscation mode.
 #[macro_export]
 macro_rules! foliage {
     ($base:expr, $size:expr, $time:expr) => {
@@ -88,7 +100,13 @@ macro_rules! foliage {
     };
 
     ($base:expr, $size:expr, $time:expr, $mode:expr) => {
-        $crate::internal::hypnus_entry($base, $size, $time, $crate::Obfuscation::Foliage, $mode)
+        $crate::internal::hypnus_entry(
+            $base, 
+            $size, 
+            $time, 
+            $crate::Obfuscation::Foliage, 
+            $mode
+        )
     };
 }
 
@@ -120,13 +138,6 @@ impl ObfMode {
     pub const Rwx: Self = ObfMode(0b0010);
 
     /// Checks whether this mode includes another [`ObfMode`] flag.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// let mode = ObfMode::Heap;
-    /// assert!(mode.contains(ObfMode::Heap));
-    /// ```
     fn contains(self, other: ObfMode) -> bool {
         (self.0 & other.0) == other.0
     }
@@ -136,13 +147,6 @@ impl core::ops::BitOr for ObfMode {
     type Output = Self;
 
     /// Combines two [`ObfMode`] instances using a bitwise OR operation.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let mode = ObfMode::Heap;
-    /// assert!(mode.contains(ObfMode::Heap));
-    /// ```
     fn bitor(self, rhs: Self) -> Self::Output {
         ObfMode(self.0 | rhs.0)
     }
@@ -210,12 +214,12 @@ struct Hypnus {
     /// Resolved WinAPI functions required for execution.
     cfg: &'static Config,
 
-    /// Obfuscation modes
+    /// Obfuscation modes.
     mode: ObfMode,
 }
 
 impl Hypnus {
-    /// Creates a new [`Hypnus`] instance configured with the target memory and delay settings.
+    /// Creates a new [`Hypnus`].
     ///
     /// # Arguments
     ///
@@ -223,10 +227,6 @@ impl Hypnus {
     /// * `size` - The size (in bytes) of the memory region.
     /// * `time` - Delay (in seconds) to wait before resuming execution after encryption.
     /// * `mode` - Optional [`ObfMode`] for stack/heap layout changes.
-    /// 
-    /// # Returns
-    ///
-    /// * A new [`Hypnus`] instance with the specified configuration.
     #[inline]
     fn new(base: u64, size: u64, time: u64, mode: ObfMode) -> Result<Self> {
         if base == 0 || size == 0 || time == 0 {
@@ -242,12 +242,7 @@ impl Hypnus {
         })
     }
 
-    /// Performs memory obfuscation using a threadpool timer-based execution chain.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(())` - on success.
-    /// * `Err` - if any internal API fails during the timer-based staging.
+    /// Performs memory obfuscation using a threadpool timer-based.
     fn timer(&mut self) -> Result<()> {
         unsafe {
             // Determine if heap obfuscation and RWX memory should be use
@@ -488,12 +483,7 @@ impl Hypnus {
         }
     }
 
-    /// Performs memory obfuscation using threadpool wait objects with timeout.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(())` - on success.
-    /// * `Err` - if any part of the wait-based staging fails.
+    /// Performs memory obfuscation using threadpool wait objects.
     fn wait(&mut self) -> Result<()> {
         unsafe {
             // Determine if heap obfuscation and RWX memory should be use
@@ -735,11 +725,6 @@ impl Hypnus {
     }
 
     /// Performs memory obfuscation using APC injection and hijacked thread contexts.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(())` - on success.
-    /// * `Err` - if any APC injection or thread manipulation step fails.
     fn foliage(&mut self) -> Result<()> {
         unsafe {
             // Determine if heap obfuscation and RWX memory should be use
@@ -766,9 +751,9 @@ impl Hypnus {
 
             // Create a new thread in suspended state for APC injection
             let mut h_thread = null_mut::<c_void>();
-            status = uwd::syscall_synthetic!(
+            status = uwd::syscall!(
                 obf!("NtCreateThreadEx"),
-                h_thread.as_uwd_mut(),
+                h_thread.as_ptr_mut(),
                 THREAD_ALL_ACCESS,
                 null_mut::<c_void>(),
                 NtCurrentProcess(),
@@ -787,7 +772,7 @@ impl Hypnus {
 
             // Get the initial context of the suspended thread
             let mut ctx_init = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
-            status = uwd::syscall!(obf!("NtGetContextThread"), h_thread, ctx_init.as_uwd_mut())? as NTSTATUS;
+            status = uwd::syscall!(obf!("NtGetContextThread"), h_thread, ctx_init.as_ptr_mut())? as NTSTATUS;
             if !NT_SUCCESS(status) {
                 bail!(s!("NtGetContextThread Failed"));
             }
@@ -939,8 +924,7 @@ pub mod internal {
     use alloc::boxed::Box;
     use super::*;
 
-    /// Structure passed to the fiber containing the [`Hypnus`] instance
-    /// and selected obfuscation strategy.
+    /// Structure passed to the fiber containing the [`Hypnus`].
     struct FiberContext {
         hypnus: Box<Hypnus>,
         obf: Obfuscation,
@@ -969,7 +953,7 @@ pub mod internal {
         }
     }
 
-    /// Launches a [`Hypnus`] execution sequence using the specified obfuscation strategy.
+    /// Execution sequence using the specified obfuscation strategy.
     ///
     /// # Arguments
     ///
@@ -1040,10 +1024,6 @@ fn current_rsp() -> u64 {
 
 trait AsHypnus {
     /// Converts `self` to a `u64` representing the pointer value.
-    ///
-    /// # Returns
-    ///
-    /// A `u64` containing the raw pointer address.
     fn as_u64(&mut self) -> u64;
 }
 

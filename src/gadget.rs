@@ -1,12 +1,12 @@
 use alloc::vec::Vec;
 use core::ffi::c_void;
 
-use dinvk::{parse::PE, shuffle};
+use dinvk::pe::PE;
 use dinvk::{
     data::{CONTEXT, IMAGE_RUNTIME_FUNCTION},
 };
 
-use crate::config::Config;
+use super::config::Config;
 
 /// List of short jump opcode patterns mapped to their corresponding register.
 const JMP_GADGETS: &[(&[u8], Reg)] = &[
@@ -113,7 +113,7 @@ impl Gadget {
     ///
     /// # Returns
     ///
-    /// * A list of `Gadget` instances, one per register if available.
+    /// A list of `Gadget` instances, one per register if available.
     fn find<B>(base: *const u8, region: &B) -> Vec<Gadget> 
     where
         B: ?Sized + AsRef<[u8]>,
@@ -154,7 +154,7 @@ impl Gadget {
     ///
     /// # Returns
     ///
-    /// * An optional tuple of (address, frame_size) for a usable gadget.
+    /// An optional tuple of (address, frame_size) for a usable gadget.
     pub fn scan_runtime<B>(
         module: *mut c_void, 
         pattern: &B, 
@@ -234,5 +234,22 @@ impl GadgetContext for CONTEXT {
     fn jmp(&mut self, cfg: &Config, target: u64) {
         let gadget = Gadget::resolve(cfg);
         gadget.apply(self, target);
+    }
+}
+
+/// Randomly shuffles the elements of a mutable slice in-place using a pseudo-random
+/// number generator seeded by the CPU's timestamp counter (`rdtsc`).
+///
+/// The shuffling algorithm is a variant of the Fisher-Yates shuffle.
+///
+/// # Arguments
+/// 
+/// * `list` - A mutable slice of elements to be shuffled.
+pub fn shuffle<T>(list: &mut [T]) {
+    let mut seed = unsafe { core::arch::x86_64::_rdtsc() };
+    for i in (1..list.len()).rev() {
+        seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
+        let j = seed as usize % (i + 1);
+        list.swap(i, j);
     }
 }

@@ -38,7 +38,7 @@ To use `hypnus`, simply import the crate and call one of the obfuscation macros:
 
 This technique is a variant of the Sleep Obfuscation method used in [Ekko](https://github.com/cracked5pider/ekko/), but it's a more evasive version that leverages the `TpSetTimer` thread pool API directly for invocation, combined with call stack spoofing.
 
-```rs
+```rust
 use hypnus::timer;
 use core::ffi::c_void;
 
@@ -59,7 +59,7 @@ fn main() {
 
 This technique is a variant of the Sleep Obfuscation method used in `Zilean`, but it's a more evasive version that leverages the `TpSetWait` thread pool API directly for invocation, combined with call stack spoofing.
 
-```rs
+```rust
 use hypnus::wait;
 use core::ffi::c_void;
 
@@ -80,7 +80,7 @@ fn main() {
 
 This technique is based on the [Foliage](https://github.com/realoriginal/foliage) method, which utilizes Asynchronous Procedure Calls (APCs) to execute spoofed callbacks on a suspended thread with call stack spoofing.
 
-```rs
+```rust
 use hypnus::foliage;
 use core::ffi::c_void;
 
@@ -101,7 +101,7 @@ fn main() {
 
 If you want to enable heap encryption or RWX protection, you must explicitly pass the appropriate flags via `ObfMode`. In addition, enabling heap obfuscation requires using the custom allocator provided by the library: `HypnusHeap`.
 
-```rs
+```rust
 #![no_std]
 #![no_main]
 
@@ -138,7 +138,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 
 ## Additional Resources
 
-For more examples, check the [examples](/examples) folder in the repository.
+For more examples, check the [examples](https://github.com/joaoviictorti/uwd/tree/main/examples) folder in the repository.
 
 ## References
 
@@ -149,4 +149,4 @@ I want to express my gratitude to these projects that inspired me to create `hyp
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](/LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](https://github.com/joaoviictorti/uwd/tree/main/LICENSE) file for details.
