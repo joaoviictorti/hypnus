@@ -219,7 +219,7 @@ struct Hypnus {
 }
 
 impl Hypnus {
-    /// Creates a new [`Hypnus`].
+    /// Creates a new `Hypnus`.
     ///
     /// # Arguments
     ///
@@ -421,7 +421,7 @@ impl Hypnus {
             ctxs[8].Rdx = ctx_backup.as_u64();
 
             // Notify that the obfuscation steps 
-            // (encrypt → delay → decrypt) have completed.
+            // (encrypt - delay - decrypt) have completed.
             ctxs[9].jmp(self.cfg, self.cfg.nt_set_event.into());
             ctxs[9].Rcx = events[2] as u64;
             ctxs[9].Rdx = 0;
