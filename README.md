@@ -41,17 +41,15 @@ This technique is a variant of the Sleep Obfuscation method used in [Ekko](https
 use hypnus::timer;
 use core::ffi::c_void;
 
-fn main() {
-    // Pointer to the memory region you want to obfuscate (e.g., shellcode)
-    let ptr = 0x13370000 as *mut c_void;
-    let size = 512;
+// Pointer to the memory region you want to obfuscate (e.g., shellcode)
+let ptr = 0x13370000 as *mut c_void;
+let size = 512;
 
-    // Sleep duration in seconds
-    let delay = 5;
+// Sleep duration in seconds
+let delay = 5;
 
-    // Sleep using ThreadPool Timer
-    timer!(ptr, size, delay);
-}
+// Sleep using ThreadPool Timer
+timer!(ptr, size, delay);
 ```
 
 ### Sleep Obfuscation via TpSetWait
@@ -62,17 +60,15 @@ This technique is a variant of the Sleep Obfuscation method used in `Zilean`, bu
 use hypnus::wait;
 use core::ffi::c_void;
 
-fn main() {
-    // Pointer to the memory region you want to obfuscate (e.g., shellcode)
-    let ptr = 0x13370000 as *mut c_void;
-    let size = 512;
+// Pointer to the memory region you want to obfuscate (e.g., shellcode)
+let ptr = 0x13370000 as *mut c_void;
+let size = 512;
 
-    // Sleep duration in seconds
-    let delay = 5;
+// Sleep duration in seconds
+let delay = 5;
 
-    // Sleep using ThreadPool Wait
-    wait!(ptr, size, delay);
-}
+// Sleep using ThreadPool Wait
+wait!(ptr, size, delay);
 ```
 
 ### Sleep Obfuscation via APC
@@ -83,17 +79,15 @@ This technique is based on the [Foliage](https://github.com/realoriginal/foliage
 use hypnus::foliage;
 use core::ffi::c_void;
 
-fn main() {
-    // Pointer to the memory region you want to obfuscate (e.g., shellcode)
-    let ptr = 0x13370000 as *mut c_void;
-    let size = 512;
+// Pointer to the memory region you want to obfuscate (e.g., shellcode)
+let ptr = 0x13370000 as *mut c_void;
+let size = 512;
 
-    // Sleep duration in seconds
-    let delay = 5;
+// Sleep duration in seconds
+let delay = 5;
 
-    // Sleep using APC
-    foliage!(ptr, size, delay);
-}
+// Sleep using APC
+foliage!(ptr, size, delay);
 ```
 
 ### Heap Obfuscation & RWX
