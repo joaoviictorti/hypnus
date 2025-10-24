@@ -25,14 +25,13 @@ Add `hypnus` to your project by updating your `Cargo.toml`:
 cargo add hypnus
 ```
 
+## Observation
+
+If you're encrypting only specific memory regions (e.g., heap, custom buffers), using the `Rust standard library (std)` is safe. However, when encrypting the entire PE image of the current process, it's strongly recommended to use `#[no_std]`. This is not a limitation of the library, but rather a constraint imposed by Rust itself, `std` may internally access thread-local storage or perform operations that lead to access violations when the full process memory is obfuscated.
+
 ## Usage
 
 To use `hypnus`, simply import the crate and call one of the obfuscation macros: `timer!`, `wait!`, or `foliage!`. These macros apply memory encryption and call stack spoofing both during the sleep window and throughout the chained API calls used to encrypt and decrypt memory, ensuring full execution flow concealment.
-
-> [!IMPORTANT]  
-> If you're encrypting only specific memory regions (e.g., heap, custom buffers), using the `Rust standard library (std)` is safe. However, when encrypting the entire PE image of the current process, it's strongly recommended to use `#[no_std]`.
->
-> This is not a limitation of the library, but rather a constraint imposed by Rust itself, `std` may internally access thread-local storage or perform operations that lead to access violations when the full process memory is obfuscated.
 
 ### Sleep Obfuscation via TpSetTimer
 
