@@ -174,7 +174,7 @@ impl Gadget {
                 let bytes = core::slice::from_raw_parts(start as *const u8, size as usize);
                 if let Some(pos) = memchr::memmem::find(bytes, pattern.as_ref()) {
                     let addr = (start as *mut u8).add(pos);
-                    if let Some(size) = uwd::StackFrame::ignoring_set_fpreg(module, runtime) {
+                    if let Some(size) = uwd::ignoring_set_fpreg(module, runtime) {
                         if size != 0 {
                             gadgets.push((addr, size))
                         }

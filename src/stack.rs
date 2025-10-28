@@ -1,7 +1,7 @@
 use alloc::string::String;
 use core::{ops::Add, ptr::null_mut};
 
-use uwd::StackFrame;
+use uwd::ignoring_set_fpreg;
 use obfstr::obfstring as s;
 use anyhow::{Context, Result, bail};
 use dinvk::{
@@ -242,16 +242,16 @@ impl Stack {
             .function_by_offset(cfg.rtl_acquire_lock.as_u64() as u32 - cfg.modules.ntdll.as_u64() as u32)
             .context(s!("Missing unwind: RtlAcquireSRWLockExclusive"))?;
 
-        self.rtl_user_thread_size = StackFrame::ignoring_set_fpreg(cfg.modules.ntdll.as_ptr(), rtl_user)
+        self.rtl_user_thread_size = ignoring_set_fpreg(cfg.modules.ntdll.as_ptr(), rtl_user)
             .context(s!("Failed to get frame size: RtlUserThreadStart"))?;
 
-        self.base_thread_size = StackFrame::ignoring_set_fpreg(cfg.modules.kernel32.as_ptr(), base_thread)
+        self.base_thread_size = ignoring_set_fpreg(cfg.modules.kernel32.as_ptr(), base_thread)
             .context(s!("Failed to get frame size: BaseThreadInitThunk"))?;
 
-        self.enum_date_size = StackFrame::ignoring_set_fpreg(cfg.modules.kernel32.as_ptr(), enum_date)
+        self.enum_date_size = ignoring_set_fpreg(cfg.modules.kernel32.as_ptr(), enum_date)
             .context(s!("Failed to get frame size: EnumDateFormatsExA"))?;
 
-        self.rlt_acquire_srw_size = StackFrame::ignoring_set_fpreg(cfg.modules.ntdll.as_ptr(), rtl_acquire_srw)
+        self.rlt_acquire_srw_size = ignoring_set_fpreg(cfg.modules.ntdll.as_ptr(), rtl_acquire_srw)
             .context(s!("Failed to get frame size: RtlAcquireSRWLockExclusive"))?;
 
         Ok(())
