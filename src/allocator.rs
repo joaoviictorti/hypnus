@@ -15,7 +15,7 @@ pub struct HypnusHeap;
 
 impl HypnusHeap {
     /// Initializes a new private heap
-    fn new() -> HANDLE {
+    fn create() -> HANDLE {
         let handle = unsafe { 
             RtlCreateHeap(
                 HEAP_GROWABLE, 
@@ -36,7 +36,7 @@ impl HypnusHeap {
     pub fn heap() -> HANDLE {
         unsafe { 
             HEAP_HANDLE.map(|p| p.as_ptr())
-                .unwrap_or_else(Self::new) 
+                .unwrap_or_else(Self::create) 
         }
     }
 }
