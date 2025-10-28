@@ -11,18 +11,18 @@ use dinvk::{
     pe::PE,
 };
 
-use super::{config::Config, gadget::Gadget};
-use super::{data::*, Obfuscation};
-use super::functions::{
-    NtAllocateVirtualMemory, 
-    NtLockVirtualMemory, 
+use crate::{Obfuscation, data::*};
+use super::{Config, Gadget, GadgetKind};
+use super::{
+    NtAllocateVirtualMemory,
+    NtLockVirtualMemory,
     NtProtectVirtualMemory
 };
 
 /// Represents a reserved stack region for custom thread execution,
 /// including calculated frame sizes for known Windows APIs.
 #[derive(Default, Debug, Clone, Copy)]
-pub struct Stack {
+pub struct StackSpoof {
     /// Address of a `gadget_rbp`, which realigns the stack (`mov rsp, rbp; ret`).
     gadget_rbp: u64,
 
@@ -42,90 +42,7 @@ pub struct Stack {
     gadget: GadgetKind,
 }
 
-/// Represents the type of gadget used to spoof control flow transitions.
-#[derive(Clone, Copy, Debug, Default)]
-pub enum GadgetKind {
-    /// `call [rbx]` gadget
-    #[default]
-    Call,
-
-    /// `jmp [rbx]` gadget
-    Jmp,
-}
-
-impl GadgetKind {
-    /// Scans the specified image base for a supported control-flow gadget.
-    ///
-    /// # Arguments
-    ///
-    /// * `base` - A pointer to the base address of the module to analyze.
-    ///
-    /// # Returns
-    ///
-    /// If a supported gadget is found.
-    pub fn detect(base: *mut core::ffi::c_void) -> Result<Self> {
-        let pe = PE::parse(base);
-        let tables = pe.unwind().entries().context(s!("Failed to parse .pdata unwind info"))?;
-        if Gadget::scan_runtime(base, &[0xFF, 0x13], tables).is_some() {
-            Ok(GadgetKind::Call)
-        } else if Gadget::scan_runtime(base, &[0xFF, 0x23], tables).is_some() {
-            Ok(GadgetKind::Jmp)
-        } else {
-            bail!(s!("No suitable call/jmp [rbx] gadget found in image"));
-        }
-    }
-
-    /// Resolves the actual memory address of the detected gadget in `kernelbase.dll`.
-    ///
-    /// # Arguments
-    ///
-    /// * `cfg` - A [`Config`] containing module base addresses and symbol mappings.
-    ///
-    /// # Returns
-    ///
-    /// * A tuple of `(gadget_address, gadget_size)`
-    /// * `Err` if the gadget could not be found.
-    pub fn resolve(&self, cfg: &Config) -> Result<(*mut u8, u32)> {
-        let pe_kernelbase = PE::parse(cfg.modules.kernelbase.as_ptr());
-        let tables = pe_kernelbase
-            .unwind()
-            .entries()
-            .context(s!("Failed to read IMAGE_RUNTIME_FUNCTION entries from .pdata section"))?;
-
-        match self {
-            GadgetKind::Call => {
-                Gadget::scan_runtime(cfg.modules.kernelbase.as_ptr(), &[0xFF, 0x13], tables)
-                    .context(s!("Missing call [rbx] gadget"))
-            }
-            GadgetKind::Jmp => {
-                Gadget::scan_runtime(cfg.modules.kernelbase.as_ptr(), &[0xFF, 0x23], tables)
-                    .context(s!("Missing jmp [rbx] gadget"))
-            }
-        }
-    }
-
-    /// Returns the byte sequence representing the gadget's instruction pattern.
-    ///
-    /// # Returns
-    ///
-    /// * A static byte slice representing the chosen gadget.
-    #[inline(always)]
-    pub fn bytes(self) -> &'static [u8] {
-        match self {
-            GadgetKind::Call => &[
-                0x48, 0x83, 0x2C, 0x24, 0x02, // sub qword ptr [rsp], 2
-                0x48, 0x89, 0xEC,             // mov rsp, rbp
-                0xC3,                         // ret
-            ],
-            GadgetKind::Jmp => &[
-                0x48, 0x89, 0xEC, // mov rsp, rbp
-                0xC3,             // ret
-            ],
-        }
-    }
-}
-
-impl Stack {
+impl StackSpoof {
     /// Create a new [`Stack`].
     ///
     /// # Arguments
@@ -202,7 +119,7 @@ impl Stack {
             NtLockVirtualMemory(NtCurrentProcess(), &mut gadget_ptr, &mut ptr_size, VM_LOCK_1);
         }
 
-        Ok(Stack {
+        Ok(StackSpoof {
             gadget_rbp: gadget_ptr as u64,
             gadget: kind,
             ..Default::default()

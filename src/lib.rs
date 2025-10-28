@@ -11,13 +11,10 @@
 
 extern crate alloc;
 
-mod config;
-mod data;
-mod functions;
-mod gadget;
-mod stack;
 mod hypnus;
+mod data;
 mod allocator;
+mod utils;
 
 pub use hypnus::*;
 pub use allocator::*;

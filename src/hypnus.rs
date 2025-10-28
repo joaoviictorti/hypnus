@@ -10,11 +10,10 @@ use dinvk::data::{
     EVENT_ALL_ACCESS, EVENT_TYPE, NTSTATUS
 };
 
-use super::{data::*, functions::*};
+use super::data::*;
 use super::{
     allocator::HypnusHeap,
-    config::{Config, init_config},
-    gadget::GadgetContext,
+    utils::*,
 };
 
 /// Initiates execution obfuscation using the `TpSetTimer`.
@@ -149,53 +148,6 @@ impl core::ops::BitOr for ObfMode {
     /// Combines two [`ObfMode`] instances using a bitwise OR operation.
     fn bitor(self, rhs: Self) -> Self::Output {
         ObfMode(self.0 | rhs.0)
-    }
-}
-
-/// Represents a wrapper for interacting with the current process's heap,
-/// with the ability to obfuscate certain memory regions.
-struct Heap;
-
-impl Heap {
-    /// Iterates over all entries in the process heap and applies
-    /// an XOR operation to the data of entries marked as allocated.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - An 8-byte key used to XOR the memory contents for obfuscation.
-    fn obfuscate(key: &[u8; 8]) {
-        let heap = HypnusHeap::heap();
-        if heap.is_null() {
-            return;
-        }
-
-        // Walk through all heap entries
-        let mut entry = unsafe { zeroed::<RTL_HEAP_WALK_ENTRY>() };
-        while RtlWalkHeap(heap, &mut entry) != 0 {
-            // Check if the entry is in use (allocated block)
-            if entry.Flags & 4 != 0 {
-                Self::xor(entry.DataAddress as *mut u8, entry.DataSize, key);
-            }
-        }
-    }
-
-    /// Applies an XOR transformation to a memory region using the given key.
-    ///
-    /// # Arguments
-    ///
-    /// * `data` - A raw pointer to the beginning of the memory region.
-    /// * `len` - The length (in bytes) of the memory region.
-    /// * `key` - An 8-byte key used to XOR the memory contents.
-    fn xor(data: *mut u8, len: usize, key: &[u8; 8]) {
-        if data.is_null() {
-            return;
-        }
-
-        for i in 0..len {
-            unsafe {
-                *data.add(i) ^= key[i % key.len()];
-            }
-        }
     }
 }
 
@@ -454,7 +406,7 @@ impl Hypnus {
             // If heap obfuscation is enabled, encrypt memory before execution
             let key = if heap {
                 let key = core::arch::x86_64::_rdtsc().to_le_bytes();
-                Heap::obfuscate(&key);
+                obfuscate_heap(&key);
                 Some(key)
             } else {
                 None
@@ -468,7 +420,7 @@ impl Hypnus {
 
             // De-obfuscate heap if needed
             if let Some(key) = key {
-                Heap::obfuscate(&key);
+                obfuscate_heap(&key);
             }
 
             // Clean up all handles
@@ -694,7 +646,7 @@ impl Hypnus {
             // If heap obfuscation is enabled, encrypt memory before execution
             let key = if heap {
                 let key = core::arch::x86_64::_rdtsc().to_le_bytes();
-                Heap::obfuscate(&key);
+                obfuscate_heap(&key);
                 Some(key)
             } else {
                 None
@@ -708,7 +660,7 @@ impl Hypnus {
 
             // De-obfuscate heap if needed
             if let Some(key) = key {
-                Heap::obfuscate(&key);
+                obfuscate_heap(&key);
             }
 
             // Clean up all handles
@@ -890,7 +842,7 @@ impl Hypnus {
             // If heap obfuscation is enabled, encrypt memory before execution
             let key = if heap {
                 let key = core::arch::x86_64::_rdtsc().to_le_bytes();
-                Heap::obfuscate(&key);
+                obfuscate_heap(&key);
                 Some(key)
             } else {
                 None
@@ -904,7 +856,7 @@ impl Hypnus {
 
             // De-obfuscate heap if needed
             if let Some(key) = key {
-                Heap::obfuscate(&key);
+                obfuscate_heap(&key);
             }
 
             // Clean up all handles
@@ -1007,26 +959,54 @@ pub mod internal {
     }
 }
 
-/// Lightweight wrapper for `NtSetEvent`, used in a Threadpool callback context.
-extern "C" fn NtSetEvent2(_: *mut c_void, event: *mut c_void, _: *mut c_void, _: u32) {
-    NtSetEvent(event, null_mut());
-}
-
-/// Get current stack pointer (RSP)
-#[inline(always)]
-fn current_rsp() -> u64 {
-    let rsp: u64;
-    unsafe { core::arch::asm!("mov {}, rsp", out(reg) rsp) };
-    rsp
-}
-
-trait AsHypnus {
+trait Asu64 {
     /// Converts `self` to a `u64` representing the pointer value.
     fn as_u64(&mut self) -> u64;
 }
 
-impl<T> AsHypnus for T {
+impl<T> Asu64 for T {
     fn as_u64(&mut self) -> u64 {
         self as *mut _ as *mut c_void as u64
+    }
+}
+
+/// Iterates over all entries in the process heap and applies
+/// an XOR operation to the data of entries marked as allocated.
+///
+/// # Arguments
+///
+/// * `key` - An 8-byte key used to XOR the memory contents for obfuscation.
+fn obfuscate_heap(key: &[u8; 8]) {
+    let heap = HypnusHeap::heap();
+    if heap.is_null() {
+        return;
+    }
+
+    // Walk through all heap entries
+    let mut entry = unsafe { zeroed::<RTL_HEAP_WALK_ENTRY>() };
+    while RtlWalkHeap(heap, &mut entry) != 0 {
+        // Check if the entry is in use (allocated block)
+        if entry.Flags & 4 != 0 {
+            xor(entry.DataAddress as *mut u8, entry.DataSize, key);
+        }
+    }
+}
+
+/// Applies an XOR transformation to a memory region using the given key.
+///
+/// # Arguments
+///
+/// * `data` - A raw pointer to the beginning of the memory region.
+/// * `len` - The length (in bytes) of the memory region.
+/// * `key` - An 8-byte key used to XOR the memory contents.
+fn xor(data: *mut u8, len: usize, key: &[u8; 8]) {
+    if data.is_null() {
+        return;
+    }
+
+    for i in 0..len {
+        unsafe {
+            *data.add(i) ^= key[i % key.len()];
+        }
     }
 }
