@@ -193,7 +193,7 @@ impl Stack {
         }
 
         unsafe {
-            // Writes the gadget address (`mov rsp, rbp; ret`) to a pointer page.
+            // Writes the gadget address (`mov rsp, rbp; ret`) to a pointer page
             *(gadget_ptr as *mut u64) = gadget_code as u64;
 
             // Locks the specified region of virtual memory into physical memory,
@@ -277,13 +277,13 @@ impl Stack {
     pub fn spoof_context(&self, cfg: &Config, ctx: CONTEXT) -> CONTEXT {
         unsafe {
             // Construct a fake execution context for the current thread,
-            // simulating a call stack that chains through spoofed return addresses.
+            // simulating a call stack that chains through spoofed return addresses
             let mut ctx_spoof = CONTEXT {
                 ContextFlags: CONTEXT_FULL,
                 ..Default::default()
             };
 
-            // Set the instruction pointer to the address of ZwWaitForWorkViaWorkerFactory.
+            // Set the instruction pointer to the address of ZwWaitForWorkViaWorkerFactory
             ctx_spoof.Rip = cfg.zw_wait_for_worker.as_u64();
 
             // Compute the spoofed RSP by subtracting all stacked frame sizes and extra alignment

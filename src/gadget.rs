@@ -98,7 +98,7 @@ impl Gadget {
             gadget
         } else {
             // SAFETY: `gadgets` is guaranteed to be non-empty at this point due to prior validation.
-            // If this invariant is ever broken, this will invoke undefined behavior.
+            // If this invariant is ever broken, this will invoke undefined behavior
             unsafe { core::hint::unreachable_unchecked() }
         }
     }

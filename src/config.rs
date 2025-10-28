@@ -42,19 +42,19 @@ pub struct Config {
     /// Trampoline function to be executed right after `RtlCaptureContext`.
     pub trampoline: u64,
 
-    /// Address of solved modules
+    // Address of solved modules
     pub modules: Modules,
 
-    /// Resolvable addresses for kernel32.dll
+    // Resolvable addresses for kernel32.dll
     pub wait_for_single: WinApi,
     pub base_thread: WinApi,
     pub enum_date: WinApi,
 
-    /// Resolvable addresses for cyptbase.dll
+    // Resolvable addresses for cyptbase.dll
     pub system_function040: WinApi,
     pub system_function041: WinApi,
 
-    /// Resolvable addresses for `ntdll.dll
+    // Resolvable addresses for `ntdll.dll
     pub nt_continue: WinApi,
     pub nt_set_event: WinApi,
     pub rtl_user_thread: WinApi,
@@ -87,7 +87,7 @@ pub struct Modules {
 }
 
 impl Config {
-    /// Create a new [`Config`].
+    /// Create a new `Config`.
     pub fn new() -> Result<Self> {
         // Resolve module base addresses
         let modules = Self::modules();
@@ -116,8 +116,7 @@ impl Config {
     ///
     /// # Returns
     ///
-    /// * `Ok(u64)` — Address of the executable trampoline stub.
-    /// * `Err(anyhow::Error)` — If memory allocation or permission change fails.
+    /// Address of the executable trampoline stub.
     pub fn alloc_callback() -> Result<u64> {
         // Trampoline shellcode
         let callback = b!(&[
@@ -156,7 +155,7 @@ impl Config {
         }
 
         // Locks the specified region of virtual memory into physical memory,
-        // preventing it from being paged to disk by the memory manager.
+        // preventing it from being paged to disk by the memory manager
         NtLockVirtualMemory(NtCurrentProcess(), &mut addr, &mut size, VM_LOCK_1);
         Ok(addr as u64)
     }
@@ -165,8 +164,7 @@ impl Config {
     ///
     /// # Returns
     ///
-    /// * `Ok(u64)` - The address of the executable trampoline
-    /// * `Err(anyhow::Error)` - If memory allocation or protection fails
+    /// The address of the executable trampoline
     pub fn alloc_trampoline() -> Result<u64> {
         // Trampoline shellcode
         let trampoline = b!(&[
@@ -205,7 +203,7 @@ impl Config {
         }
 
         // Locks the specified region of virtual memory into physical memory,
-        // preventing it from being paged to disk by the memory manager.
+        // preventing it from being paged to disk by the memory manager
         NtLockVirtualMemory(NtCurrentProcess(), &mut addr, &mut size, VM_LOCK_1);
         Ok(addr as u64)
     }
@@ -214,11 +212,11 @@ impl Config {
     ///
     /// # Returns
     ///  
-    /// * Returns raw pointers as `*mut c_void`, which are converted to `u64` inside [`Self::functions`].
+    /// Raw pointers
     ///
     /// # Panics
     ///
-    /// * Will panic if spoofed `LoadLibraryA` call fails.
+    /// Will panic if spoofed `LoadLibraryA` call fails.
     fn modules() -> Modules {
         // Load essential DLLs
         let ntdll = get_ntdll_address();
@@ -335,7 +333,7 @@ impl Cfg {
     ///
     /// # Returns
     ///
-    /// * `Ok(())` on success, or an error if the operation fails or CFG query fails.
+    /// On success, or an error if the operation fails or CFG query fails.
     pub fn add(module: usize, function: usize) -> Result<()> {
         unsafe {
             let nt_header = PE::parse(module as *mut c_void)

@@ -14,8 +14,8 @@ static mut HEAP_HANDLE: Option<NonNull<c_void>> = None;
 pub struct HypnusHeap;
 
 impl HypnusHeap {
-    /// Initializes a new private heap using `RtlCreateHeap`.
-    fn create() -> HANDLE {
+    /// Initializes a new private heap
+    fn new() -> HANDLE {
         let handle = unsafe { 
             RtlCreateHeap(
                 HEAP_GROWABLE, 
@@ -36,7 +36,7 @@ impl HypnusHeap {
     pub fn heap() -> HANDLE {
         unsafe { 
             HEAP_HANDLE.map(|p| p.as_ptr())
-                .unwrap_or_else(Self::create) 
+                .unwrap_or_else(Self::new) 
         }
     }
 }
@@ -50,7 +50,7 @@ unsafe impl GlobalAlloc for HypnusHeap {
     ///
     /// # Returns
     ///
-    /// * A pointer to the allocated memory, or `ptr::null_mut()` if allocation fails.
+    /// A pointer to the allocated memory, or `ptr::null_mut()` if allocation fails.
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let heap = Self::heap();
         let size = layout.size();
@@ -70,7 +70,7 @@ unsafe impl GlobalAlloc for HypnusHeap {
     ///
     /// # Notes
     ///
-    /// * If `ptr` is null, this function does nothing.
+    /// If `ptr` is null, this function does nothing.
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         if ptr.is_null() {
             return;
