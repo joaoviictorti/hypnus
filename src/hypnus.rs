@@ -10,11 +10,8 @@ use dinvk::data::{
     EVENT_ALL_ACCESS, EVENT_TYPE, NTSTATUS
 };
 
-use super::data::*;
-use super::{
-    allocator::HypnusHeap,
-    utils::*,
-};
+use super::{data::*, utils::*};
+use super::allocator::HypnusHeap;
 
 /// Initiates execution obfuscation using the `TpSetTimer`.
 ///
@@ -972,10 +969,6 @@ impl<T> Asu64 for T {
 
 /// Iterates over all entries in the process heap and applies
 /// an XOR operation to the data of entries marked as allocated.
-///
-/// # Arguments
-///
-/// * `key` - An 8-byte key used to XOR the memory contents for obfuscation.
 fn obfuscate_heap(key: &[u8; 8]) {
     let heap = HypnusHeap::heap();
     if heap.is_null() {
@@ -993,12 +986,6 @@ fn obfuscate_heap(key: &[u8; 8]) {
 }
 
 /// Applies an XOR transformation to a memory region using the given key.
-///
-/// # Arguments
-///
-/// * `data` - A raw pointer to the beginning of the memory region.
-/// * `len` - The length (in bytes) of the memory region.
-/// * `key` - An 8-byte key used to XOR the memory contents.
 fn xor(data: *mut u8, len: usize, key: &[u8; 8]) {
     if data.is_null() {
         return;

@@ -40,6 +40,15 @@ pub fn init_config() -> Result<&'static Config> {
     CONFIG.try_call_once(Config::new)
 }
 
+/// Windows DLLs required during initialization.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Modules {
+    pub ntdll: Dll,
+    pub kernel32: Dll,
+    pub cryptbase: Dll,
+    pub kernelbase: Dll,
+}
+
 /// Stores resolved DLL base addresses and function pointers.
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Config {
@@ -67,23 +76,11 @@ pub struct Config {
     pub zw_wait_for_worker: WinApi,
 }
 
-/// Windows DLLs required during initialization.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Modules {
-    pub ntdll: Dll,
-    pub kernel32: Dll,
-    pub cryptbase: Dll,
-    pub kernelbase: Dll,
-}
-
 impl Config {
     /// Create a new `Config`.
     pub fn new() -> Result<Self> {
-        // Resolve module base addresses
-        let modules = Self::modules();
-
         // Resolve hashed function addresses for all required APIs
-        let mut cfg = Self::functions(modules);
+        let mut cfg = Self::functions(Self::modules());
 
         // Initialize custom stack layout used for context spoofing
         cfg.stack = StackSpoof::new(&cfg)?;
@@ -202,11 +199,7 @@ impl Config {
     ///
     /// # Returns
     ///  
-    /// Raw pointers
-    ///
-    /// # Panics
-    ///
-    /// Will panic if spoofed `LoadLibraryA` call fails.
+    /// The address of the modules
     fn modules() -> Modules {
         // Load essential DLLs
         let ntdll = get_ntdll_address();
@@ -239,7 +232,7 @@ impl Config {
     ///
     /// # Returns
     ///
-    /// A [`Config`] struct with resolved function pointers (without stack info).
+    /// A [`Config`] struct with resolved function pointers.
     fn functions(modules: Modules) -> Self {
         let ntdll = modules.ntdll.as_ptr();
         let kernel32 = modules.kernel32.as_ptr();

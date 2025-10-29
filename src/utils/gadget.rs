@@ -5,9 +5,7 @@ use core::ffi::c_void;
 use obfstr::obfstring as s;
 use anyhow::{Context, Result, bail};
 use dinvk::pe::PE;
-use dinvk::{
-    data::{CONTEXT, IMAGE_RUNTIME_FUNCTION},
-};
+use dinvk::data::{CONTEXT, IMAGE_RUNTIME_FUNCTION};
 
 use super::Config;
 
