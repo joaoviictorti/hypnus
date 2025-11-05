@@ -1,3 +1,6 @@
+// Copyright (c) 2025 joaoviictorti
+// Licensed under the MIT License. See LICENSE file in the project root for details.
+
 use alloc::vec::Vec;
 use alloc::string::String;
 use core::ffi::c_void;
