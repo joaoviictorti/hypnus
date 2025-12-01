@@ -29,29 +29,3 @@ jobs:
 
       - name: Check docs
         run: cargo doc --no-deps --document-private-items
-        
-  build:
-    # Builds the examples listed in the matrix
-    name: Build Examples
-    runs-on: windows-latest
-
-    strategy:
-      matrix:
-        example: [foliage, timer, wait]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Rust
-        run: rustup default stable
-
-      - name: Build example ${{ matrix.example }}
-        env:
-          CARGO_PROFILE_RELEASE_PANIC: abort
-        run: cargo build --release --example ${{ matrix.example }}
-
-      - name: Upload ${{ matrix.example }}.exe
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.example }}.exe
-          path: target/release/examples/${{ matrix.example }}.exe
