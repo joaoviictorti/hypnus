@@ -1,9 +1,6 @@
-// Copyright (c) 2025 joaoviictorti
-// Licensed under the MIT License. See LICENSE file in the project root for details.
-
 use core::ffi::c_void;
 use core::ptr::null_mut;
-use dinvk::data::{EVENT_TYPE, HANDLE, LARGE_INTEGER, NTSTATUS};
+use dinvk::types::{EVENT_TYPE, HANDLE, LARGE_INTEGER, NTSTATUS};
 
 pub const PAGE_READWRITE: u32 = 0x04;
 pub const PAGE_EXECUTE_READ: u64 = 0x20;

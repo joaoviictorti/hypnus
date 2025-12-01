@@ -1,33 +1,58 @@
-// Copyright (c) 2025 joaoviictorti
-// Licensed under the MIT License. See LICENSE file in the project root for details.
-
 use alloc::string::String;
 use core::{ffi::c_void, mem::zeroed, ptr::null_mut};
 
 use uwd::AsPointer;
 use anyhow::{Result, bail};
 use obfstr::{obfstr as obf, obfstring as s};
-use dinvk::{NtCurrentProcess, NtCurrentThread, NT_SUCCESS};
-use dinvk::data::{
+use dinvk::winapis::{
+    NtCurrentProcess,
+    NtCurrentThread,
+    NT_SUCCESS
+};
+use dinvk::types::{
     LARGE_INTEGER, CONTEXT,
-    EVENT_ALL_ACCESS, EVENT_TYPE, NTSTATUS
+    EVENT_ALL_ACCESS, EVENT_TYPE, 
+    NTSTATUS
 };
 
-use super::{data::*, utils::*};
-use super::allocator::HypnusHeap;
+use crate::{types::*, winapis::*};
+use crate::config::{Config, init_config, current_rsp};
+use crate::gadget::GadgetContext;
+use crate::allocator::HypnusHeap;
 
 /// Initiates execution obfuscation using the `TpSetTimer`.
 ///
-/// # Arguments
+/// # Example
+/// 
+/// ```
+/// #![no_std]
+/// #![no_main]
 ///
-/// * `$base` - Base address of the memory region to encrypt/decrypt.
-/// * `$size` - Size (in bytes) of the memory region.
-/// * `$time` - Delay in seconds before resuming execution.
-/// * `$mode` - Obfuscation mode.
+/// extern crate alloc;
+/// 
+/// use hypnus::{foliage, ObfMode};
+/// use hypnus::allocator::HypnusHeap;
+/// use core::ffi::c_void;
+/// 
+/// #[global_allocator]
+/// static ALLOCATOR: HypnusHeap = HypnusHeap;
+/// 
+/// // Pointer to the memory region you want to obfuscate (e.g., shellcode)
+/// let data = b"\x90\x90\x90\xCC";
+/// let ptr = data.as_ptr() as *mut c_void;
+/// let size = data.len() as u64;
+///
+/// // Sleep duration in seconds
+/// let delay = 5;
+/// loop {
+///     // Full obfuscation with heap encryption and RWX memory protection
+///     timer!(ptr, size, delay, ObfMode::Heap | ObfMode::Rwx);
+/// }
+/// ```
 #[macro_export]
 macro_rules! timer {
     ($base:expr, $size:expr, $time:expr) => {
-        $crate::internal::hypnus_entry(
+        $crate::__private::hypnus_entry(
             $base, 
             $size, 
             $time, 
@@ -37,7 +62,7 @@ macro_rules! timer {
     };
 
     ($base:expr, $size:expr, $time:expr, $mode:expr) => {
-        $crate::internal::hypnus_entry(
+        $crate::__private::hypnus_entry(
             $base, 
             $size, 
             $time, 
@@ -49,16 +74,37 @@ macro_rules! timer {
 
 /// Initiates execution obfuscation using the `TpSetWait`.
 ///
-/// # Arguments
+/// # Example
+/// 
+/// ```
+/// #![no_std]
+/// #![no_main]
 ///
-/// * `$base` - Base address of the memory region to encrypt/decrypt.
-/// * `$size` - Size (in bytes) of the memory region.
-/// * `$time` - Delay in seconds before resuming execution.
-/// * `$mode` - Obfuscation mode.
+/// extern crate alloc;
+/// 
+/// use hypnus::{foliage, ObfMode};
+/// use hypnus::allocator::HypnusHeap;
+/// use core::ffi::c_void;
+/// 
+/// #[global_allocator]
+/// static ALLOCATOR: HypnusHeap = HypnusHeap;
+/// 
+/// // Pointer to the memory region you want to obfuscate (e.g., shellcode)
+/// let data = b"\x90\x90\x90\xCC";
+/// let ptr = data.as_ptr() as *mut c_void;
+/// let size = data.len() as u64;
+///
+/// // Sleep duration in seconds
+/// let delay = 5;
+/// loop {
+///     // Full obfuscation with heap encryption and RWX memory protection
+///     wait!(ptr, size, delay, ObfMode::Heap | ObfMode::Rwx);
+/// }
+/// ```
 #[macro_export]
 macro_rules! wait {
     ($base:expr, $size:expr, $time:expr) => {
-        $crate::internal::hypnus_entry(
+        $crate::__private::hypnus_entry(
             $base, 
             $size, 
             $time, 
@@ -68,7 +114,7 @@ macro_rules! wait {
     };
 
     ($base:expr, $size:expr, $time:expr, $mode:expr) => {
-        $crate::internal::hypnus_entry(
+        $crate::__private::hypnus_entry(
             $base, 
             $size, 
             $time, 
@@ -80,16 +126,37 @@ macro_rules! wait {
 
 /// Initiates execution obfuscation using the `NtQueueApcThread`.
 ///
-/// # Arguments
+/// # Example
+/// 
+/// ```
+/// #![no_std]
+/// #![no_main]
 ///
-/// * `$base` - Base address of the memory region to encrypt/decrypt.
-/// * `$size` - Size (in bytes) of the memory region.
-/// * `$time` - Delay in seconds before resuming execution.
-/// * `$mode` - Obfuscation mode.
+/// extern crate alloc;
+/// 
+/// use hypnus::{foliage, ObfMode};
+/// use hypnus::allocator::HypnusHeap;
+/// use core::ffi::c_void;
+/// 
+/// #[global_allocator]
+/// static ALLOCATOR: HypnusHeap = HypnusHeap;
+/// 
+/// // Pointer to the memory region you want to obfuscate (e.g., shellcode)
+/// let data = b"\x90\x90\x90\xCC";
+/// let ptr = data.as_ptr() as *mut c_void;
+/// let size = data.len() as u64;
+///
+/// // Sleep duration in seconds
+/// let delay = 5;
+/// loop {
+///     // Full obfuscation with heap encryption and RWX memory protection
+///     foliage!(ptr, size, delay, ObfMode::Heap | ObfMode::Rwx);
+/// }
+/// ```
 #[macro_export]
 macro_rules! foliage {
     ($base:expr, $size:expr, $time:expr) => {
-        $crate::internal::hypnus_entry(
+        $crate::__private::hypnus_entry(
             $base, 
             $size, 
             $time, 
@@ -99,7 +166,7 @@ macro_rules! foliage {
     };
 
     ($base:expr, $size:expr, $time:expr, $mode:expr) => {
-        $crate::internal::hypnus_entry(
+        $crate::__private::hypnus_entry(
             $base, 
             $size, 
             $time, 
@@ -127,16 +194,16 @@ pub enum Obfuscation {
 pub struct ObfMode(pub u32);
 
 impl ObfMode {
-    /// Does not activate any modes
+    /// No additional obfuscation modes are used.
     pub const None: Self = ObfMode(0b0000);
-    
-    /// Heap encryption mode
+
+    /// Enables heap encryption.
     pub const Heap: Self = ObfMode(0b0001);
 
-    /// Mode of use for RWX protection
+    /// Allows RWX protected memory regions.
     pub const Rwx: Self = ObfMode(0b0010);
 
-    /// Checks whether this mode includes another [`ObfMode`] flag.
+    /// Checks whether the flag contains another `ObfMode`.
     fn contains(self, other: ObfMode) -> bool {
         (self.0 & other.0) == other.0
     }
@@ -145,7 +212,7 @@ impl ObfMode {
 impl core::ops::BitOr for ObfMode {
     type Output = Self;
 
-    /// Combines two [`ObfMode`] instances using a bitwise OR operation.
+    /// Combines two `ObfMode` flags using bitwise OR.
     fn bitor(self, rhs: Self) -> Self::Output {
         ObfMode(self.0 | rhs.0)
     }
@@ -172,17 +239,10 @@ struct Hypnus {
 
 impl Hypnus {
     /// Creates a new `Hypnus`.
-    ///
-    /// # Arguments
-    ///
-    /// * `base` - Memory region to encrypt/decrypt.
-    /// * `size` - The size (in bytes) of the memory region.
-    /// * `time` - Delay (in seconds) to wait before resuming execution after encryption.
-    /// * `mode` - Optional [`ObfMode`] for stack/heap layout changes.
     #[inline]
     fn new(base: u64, size: u64, time: u64, mode: ObfMode) -> Result<Self> {
         if base == 0 || size == 0 || time == 0 {
-            bail!(s!("Invalid arguments"))
+            bail!(s!("invalid arguments"))
         }
 
         Ok(Self {
@@ -194,7 +254,7 @@ impl Hypnus {
         })
     }
 
-    /// Performs memory obfuscation using a threadpool timer-based.
+    /// Performs memory obfuscation using a thread-pool timer sequence.
     fn timer(&mut self) -> Result<()> {
         unsafe {
             // Determine if heap obfuscation and RWX memory should be use
@@ -221,14 +281,14 @@ impl Hypnus {
                 }
             }
 
-            // Create dedicated thread pool with a single thread
+            // Allocate dedicated threadpool with one worker
             let mut pool = null_mut();
             let mut status = TpAllocPool(&mut pool, null_mut());
             if !NT_SUCCESS(status) {
                 bail!(s!("TpAllocPool Failed"));
             }
 
-            // Sets custom stack size for the thread pool
+            // Configure threadpool stack sizes
             let mut stack = TP_POOL_STACK_INFORMATION { StackCommit: 0x80000, StackReserve: 0x80000 };
             status = TpSetPoolStackInformation(pool, &mut stack);
             if !NT_SUCCESS(status) {
@@ -238,10 +298,10 @@ impl Hypnus {
             TpSetPoolMinThreads(pool, 1);
             TpSetPoolMaxThreads(pool, 1);
 
-            // Configure callback environment to use the custom pool
+            // Prepare callback environment
             let mut env = TP_CALLBACK_ENVIRON_V3 { Pool: pool, ..Default::default() };
 
-            // First timer: capture current context
+            // Capture the current thread context
             let mut timer_ctx = null_mut();
             let mut ctx_init = CONTEXT {
                 ContextFlags: CONTEXT_FULL,
@@ -267,7 +327,7 @@ impl Hypnus {
             delay.QuadPart = -(100i64 * 10_000);
             TpSetTimer(timer_ctx, &mut delay, 0, 0);
 
-            // Second Timer: Signal event to confirm context capture
+            // Signal after RtlCaptureContext finishes
             let mut timer_event = null_mut();
             status = TpAllocTimer(
                 &mut timer_event, 
@@ -283,20 +343,20 @@ impl Hypnus {
             delay.QuadPart = -(200i64 * 10_000);
             TpSetTimer(timer_event, &mut delay, 0, 0);
 
-            // Wait for the event to be set after context capture
+            // Wait for context capture to complete
             status = NtWaitForSingleObject(events[0], 0, null_mut());
             if !NT_SUCCESS(status) {
                 bail!(s!("NtWaitForSingleObject Failed"));
             }
 
-            // Clone the base context 10 times for the full spoofed execution chain
+            // Build multi-step spoofed CONTEXT chain
             let mut ctxs = [ctx_init; 10];
             for ctx in &mut ctxs {
                 ctx.Rax = self.cfg.nt_continue.as_u64();
                 ctx.Rsp -= 8;
             }
 
-            // Duplicate current thread handle for context manipulation
+            // Duplicate thread handle for context manipulation
             let mut h_thread = null_mut();
             status = NtDuplicateObject(
                 NtCurrentProcess(),
@@ -312,7 +372,7 @@ impl Hypnus {
                 bail!(s!("NtDuplicateObject Failed"));
             }
 
-            // Preparing for call stack spoofing
+            // Base CONTEXT for spoofing
             ctx_init.Rsp = current_rsp();
             let mut ctx_spoof = self.cfg.stack.spoof_context(self.cfg, ctx_init);
 
@@ -322,7 +382,7 @@ impl Hypnus {
             ctxs[0].Rdx = 0;
             ctxs[0].R8  = 0;
 
-            // Temporarily makes the target memory region writable before encryption
+            // Temporary RW access
             let mut old_protect = 0u32;
             let (mut base, mut size) = (self.base, self.size);
             ctxs[1].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
@@ -331,60 +391,60 @@ impl Hypnus {
             ctxs[1].R8  = size.as_u64();
             ctxs[1].R9  = PAGE_READWRITE as u64;
 
-            // Encrypts or masks the specified memory region
+            // Encrypt region
             ctxs[2].jmp(self.cfg, self.cfg.system_function040.into());
             ctxs[2].Rcx = base;
             ctxs[2].Rdx = size;
             ctxs[2].R8  = 0;
 
-            // Saves the original CONTEXT so it can be restored later
+            // Backup context
             let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].jmp(self.cfg, self.cfg.nt_get_context_thread.into());
             ctxs[3].Rcx = h_thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
 
-            // Injects a spoofed CONTEXT to modify return flow (stack/frame spoofing)
+            // Inject spoofed context
             ctxs[4].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
             ctxs[4].Rcx = h_thread as u64;
             ctxs[4].Rdx = ctx_spoof.as_u64();
 
-            // Sleep primitive using the current thread handle and a delay
+            // Sleep
             ctxs[5].jmp(self.cfg, self.cfg.wait_for_single.into());
             ctxs[5].Rcx = h_thread as u64;
             ctxs[5].Rdx = self.time * 1000;
             ctxs[5].R8  = 0;
 
-            // Decrypts (unmasks) the memory after waking up
+            // Decrypt region
             ctxs[6].jmp(self.cfg, self.cfg.system_function041.into());
             ctxs[6].Rcx = base;
             ctxs[6].Rdx = size;
             ctxs[6].R8  = 0;
 
-            // Restores the memory protection after decryption
+            // Restore protection
             ctxs[7].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
             ctxs[7].Rcx = NtCurrentProcess() as u64;
             ctxs[7].Rdx = base.as_u64();
             ctxs[7].R8  = size.as_u64();
             ctxs[7].R9  = protection;
 
-            // Restores the original thread context
+            // Restore thread context
             ctxs[8].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
             ctxs[8].Rcx = h_thread as u64;
             ctxs[8].Rdx = ctx_backup.as_u64();
 
-            // Notify that the obfuscation steps 
+            // Final event notification
             ctxs[9].jmp(self.cfg, self.cfg.nt_set_event.into());
             ctxs[9].Rcx = events[2] as u64;
             ctxs[9].Rdx = 0;
 
-            // Layout the entire spoofed CONTEXT chain on the stack
+            // Layout spoofed CONTEXT chain on stack
             self.cfg.stack.spoof(&mut ctxs, self.cfg, Obfuscation::Timer)?;
 
-            // Write `old_protect` values into the expected return slots
+            // Patch old_protect into expected return slots
             ((ctxs[1].Rsp + 0x28) as *mut u64).write(old_protect.as_u64());
             ((ctxs[7].Rsp + 0x28) as *mut u64).write(old_protect.as_u64());
 
-            // Schedule CONTEXT chain execution via TpSetTimer + NtContinue
+            // Schedule each CONTEXT via TpSetTimer
             for ctx in &mut ctxs {
                 let mut timer = null_mut();
                 status = TpAllocTimer(
@@ -403,7 +463,7 @@ impl Hypnus {
                 TpSetTimer(timer, &mut delay, 0, 0);
             }
 
-            // If heap obfuscation is enabled, encrypt memory before execution
+            // Optional heap encryption
             let key = if heap {
                 let key = core::arch::x86_64::_rdtsc().to_le_bytes();
                 obfuscate_heap(&key);
@@ -412,18 +472,18 @@ impl Hypnus {
                 None
             };
 
-            // Wait until the thread pool finishes the spoofed chain
+            // Wait for chain completion
             status = NtSignalAndWaitForSingleObject(events[1], events[2], 0, null_mut());
             if !NT_SUCCESS(status) {
                 bail!(s!("NtSignalAndWaitForSingleObject Failed"));
             }
 
-            // De-obfuscate heap if needed
+            // Undo heap encryption
             if let Some(key) = key {
                 obfuscate_heap(&key);
             }
 
-            // Clean up all handles
+            // Cleanup
             NtClose(h_thread);
             CloseThreadpool(pool);
             events.iter().for_each(|h| {
@@ -434,7 +494,10 @@ impl Hypnus {
         }
     }
 
-    /// Performs memory obfuscation using threadpool wait objects.
+    /// Performs memory obfuscation using a thread-pool wait–based strategy.
+    ///
+    /// This strategy is similar to [`Hypnus::timer`], but uses `TpSetWait`
+    /// instead of `TpSetTimer` to drive the spoofed CONTEXT chain.
     fn wait(&mut self) -> Result<()> {
         unsafe {
             // Determine if heap obfuscation and RWX memory should be use
@@ -445,7 +508,7 @@ impl Hypnus {
                 PAGE_EXECUTE_READ
             };
 
-            // Create synchronization events
+            // Events used to synchronize context capture and chain completion
             let mut events = [null_mut(); 4];
             for event in &mut events {
                 let status = NtCreateEvent(
@@ -461,14 +524,14 @@ impl Hypnus {
                 }
             }
 
-            // Create dedicated thread pool with a single thread
+            // Allocate dedicated threadpool with one worker
             let mut pool = null_mut();
             let mut status = TpAllocPool(&mut pool, null_mut());
             if !NT_SUCCESS(status) {
                 bail!(s!("TpAllocPool Failed"));
             }
 
-            // Sets custom stack size for the thread pool
+            // Configure threadpool stack sizes
             let mut stack = TP_POOL_STACK_INFORMATION { StackCommit: 0x80000, StackReserve: 0x80000 };
             status = TpSetPoolStackInformation(pool, &mut stack);
             if !NT_SUCCESS(status) {
@@ -478,10 +541,10 @@ impl Hypnus {
             TpSetPoolMinThreads(pool, 1);
             TpSetPoolMaxThreads(pool, 1);
 
-            // Configure callback environment to use the custom pool
+            // Prepare callback environment
             let mut env = TP_CALLBACK_ENVIRON_V3 { Pool: pool, ..Default::default() };
 
-            // First timer: capture current context
+            // Capture the current thread context
             let mut wait_ctx = null_mut();
             let mut ctx_init = CONTEXT {
                 ContextFlags: CONTEXT_FULL,
@@ -507,7 +570,7 @@ impl Hypnus {
             delay.QuadPart = -(100i64 * 10_000);
             TpSetWait(wait_ctx, events[0], &mut delay);
 
-            // Second Timer: Signal event to confirm context capture
+            // Signal after RtlCaptureContext finishes
             let mut wait_event = null_mut();
             status = TpAllocWait(
                 &mut wait_event, 
@@ -523,20 +586,20 @@ impl Hypnus {
             delay.QuadPart = -(200i64 * 10_000);
             TpSetWait(wait_event, events[0], &mut delay);
 
-            // Wait for the event to be set after context capture
+            // Wait for context capture to complete
             status = NtWaitForSingleObject(events[1], 0, null_mut());
             if !NT_SUCCESS(status) {
                 bail!(s!("NtWaitForSingleObject Failed"));
             }
 
-            // Clone the base context 10 times for the full spoofed execution chain
+            // Build multi-step spoofed CONTEXT chain
             let mut ctxs = [ctx_init; 10];
             for ctx in &mut ctxs {
                 ctx.Rax = self.cfg.nt_continue.as_u64();
                 ctx.Rsp -= 8;
             }
 
-            // Get handle to current thread
+            // Duplicate thread handle for context manipulation
             let mut h_thread = null_mut();
             status = NtDuplicateObject(
                 NtCurrentProcess(),
@@ -552,7 +615,7 @@ impl Hypnus {
                 bail!(s!("NtDuplicateObject Failed"));
             }
 
-            // Preparing for call stack spoofing
+            // Base CONTEXT for spoofing
             ctx_init.Rsp = current_rsp();
             let mut ctx_spoof = self.cfg.stack.spoof_context(self.cfg, ctx_init);
 
@@ -562,7 +625,7 @@ impl Hypnus {
             ctxs[0].Rdx = 0;
             ctxs[0].R8  = 0;
 
-            // Temporarily makes the target memory region writable before encryption
+            // Temporary RW access
             let mut old_protect = 0u32;
             let (mut base, mut size) = (self.base, self.size);
             ctxs[1].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
@@ -571,60 +634,60 @@ impl Hypnus {
             ctxs[1].R8  = size.as_u64();
             ctxs[1].R9  = PAGE_READWRITE as u64;
 
-            // Encrypts or masks the specified memory region
+            // Encrypt region
             ctxs[2].jmp(self.cfg, self.cfg.system_function040.into());
             ctxs[2].Rcx = base;
             ctxs[2].Rdx = size;
             ctxs[2].R8  = 0;
 
-            // Saves the original CONTEXT so it can be restored later
+            // Backup context
             let mut ctx_backup = CONTEXT { ContextFlags: CONTEXT_FULL, ..Default::default() };
             ctxs[3].jmp(self.cfg, self.cfg.nt_get_context_thread.into());
             ctxs[3].Rcx = h_thread as u64;
             ctxs[3].Rdx = ctx_backup.as_u64();
 
-            // Injects a spoofed CONTEXT to modify return flow (stack/frame spoofing)
+            // Inject spoofed context
             ctxs[4].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
             ctxs[4].Rcx = h_thread as u64;
             ctxs[4].Rdx = ctx_spoof.as_u64();
 
-            // Sleep primitive using the current thread handle and a delay
+            // Sleep
             ctxs[5].jmp(self.cfg, self.cfg.wait_for_single.into());
             ctxs[5].Rcx = h_thread as u64;
             ctxs[5].Rdx = self.time * 1000;
             ctxs[5].R8  = 0;
 
-            // Decrypts (unmasks) the memory after waking up
+            // Decrypt region
             ctxs[6].jmp(self.cfg, self.cfg.system_function041.into());
             ctxs[6].Rcx = base;
             ctxs[6].Rdx = size;
             ctxs[6].R8  = 0;
 
-            // Restores the memory protection after decryption
+            // Restore protection
             ctxs[7].jmp(self.cfg, self.cfg.nt_protect_virtual_memory.into());
             ctxs[7].Rcx = NtCurrentProcess() as u64;
             ctxs[7].Rdx = base.as_u64();
             ctxs[7].R8  = size.as_u64();
             ctxs[7].R9  = protection;
 
-            // Restores the original thread contex
+            // Restore thread context
             ctxs[8].jmp(self.cfg, self.cfg.nt_set_context_thread.into());
             ctxs[8].Rcx = h_thread as u64;
             ctxs[8].Rdx = ctx_backup.as_u64();
 
-            // Notify that the obfuscation steps
+            // Final event notification
             ctxs[9].jmp(self.cfg, self.cfg.nt_set_event.into());
             ctxs[9].Rcx = events[3] as u64;
             ctxs[9].Rdx = 0;
 
-            // Layout the entire spoofed CONTEXT chain on the stack
+            // Layout spoofed CONTEXT chain on stack
             self.cfg.stack.spoof(&mut ctxs, self.cfg, Obfuscation::Wait)?;
 
-            // Write `old_protect` values into the expected return slots
+            // Patch old_protect into expected return slots
             ((ctxs[1].Rsp + 0x28) as *mut u64).write(old_protect.as_u64());
             ((ctxs[7].Rsp + 0x28) as *mut u64).write(old_protect.as_u64());
 
-            // Schedule CONTEXTs on timer with staggered delays
+            // Schedule each CONTEXT via TpAllocWait
             for ctx in &mut ctxs {
                 let mut wait = null_mut();
                 status = TpAllocWait(
@@ -643,7 +706,7 @@ impl Hypnus {
                 TpSetWait(wait, events[0], &mut delay);
             }
 
-            // If heap obfuscation is enabled, encrypt memory before execution
+            // Optional heap encryption
             let key = if heap {
                 let key = core::arch::x86_64::_rdtsc().to_le_bytes();
                 obfuscate_heap(&key);
@@ -652,7 +715,7 @@ impl Hypnus {
                 None
             };
 
-            // Wait until the thread pool finishes the spoofed chain
+            // Wait for chain completion
             status = NtSignalAndWaitForSingleObject(events[2], events[3], 0, null_mut());
             if !NT_SUCCESS(status) {
                 bail!(s!("NtSignalAndWaitForSingleObject Failed"));
@@ -663,7 +726,7 @@ impl Hypnus {
                 obfuscate_heap(&key);
             }
 
-            // Clean up all handles
+            // Cleanup
             NtClose(h_thread);
             CloseThreadpool(pool);
             events.iter().for_each(|h| {
@@ -869,10 +932,48 @@ impl Hypnus {
     }
 }
 
-/// Internal module responsible for launching obfuscated execution flows.
-pub mod internal {
+#[doc(hidden)]
+pub mod __private {
     use alloc::boxed::Box;
     use super::*;
+
+    /// Execution sequence using the specified obfuscation strategy.
+    pub fn hypnus_entry(base: *mut c_void, size: u64, time: u64, obf: Obfuscation, mode: ObfMode) {
+        let master = ConvertThreadToFiber(null_mut());
+        if master.is_null() {
+            return;
+        }
+
+        match Hypnus::new(base as u64, size, time, mode) {
+            Ok(hypnus) => {
+                // Creates the context to be passed into the new fiber.
+                let fiber_ctx = Box::new(FiberContext {
+                    hypnus: Box::new(hypnus),
+                    obf,
+                    master,
+                });
+
+                // Creates a new fiber with 1MB stack, pointing to the `hypnus_fiber` function.
+                let fiber = CreateFiber(
+                    0x100000, 
+                    Some(hypnus_fiber), 
+                    Box::into_raw(fiber_ctx).cast()
+                );
+                
+                if fiber.is_null() {
+                    return;
+                }
+
+                SwitchToFiber(fiber);
+                DeleteFiber(fiber);
+                ConvertFiberToThread();
+            }
+            Err(_error) => {
+                #[cfg(debug_assertions)]
+                dinvk::println!("[Hypnus::new] {:?}", _error);
+            }
+        }
+    }
 
     /// Structure passed to the fiber containing the [`Hypnus`].
     struct FiberContext {
@@ -883,7 +984,7 @@ pub mod internal {
 
     /// Trampoline function executed inside the fiber.
     ///
-    /// It unpacks the [`FiberContext`], runs the selected obfuscation method,
+    /// It unpacks the `FiberContext`, runs the selected obfuscation method,
     /// and optionally logs errors in debug mode.
     extern "system" fn hypnus_fiber(ctx: *mut c_void) {
         unsafe {
@@ -902,61 +1003,6 @@ pub mod internal {
             SwitchToFiber(ctx.master);
         }
     }
-
-    /// Execution sequence using the specified obfuscation strategy.
-    ///
-    /// # Arguments
-    ///
-    /// * `base` - Memory region to encrypt/decrypt.
-    /// * `size` - Size of the memory region in bytes.
-    /// * `time` - Time (in seconds) to wait before decrypting/resuming.
-    /// * `obf` - Chosen obfuscation strategy.
-    /// * `mode` - Optional [`ObfMode`] for stack/heap layout changes.
-    pub fn hypnus_entry(base: *mut c_void, size: u64, time: u64, obf: Obfuscation, mode: ObfMode) {
-        // Converts the current thread to a fiber so we can switch to another fiber manually
-        let master = ConvertThreadToFiber(null_mut());
-        if master.is_null() {
-            return;
-        }
-
-        // Initializes the `Hypnus` structure, responsible for applying sleep or obfuscation
-        match Hypnus::new(base as u64, size, time, mode) {
-            Ok(hypnus) => {
-                // Creates the context to be passed into the new fiber.
-                // This includes the `Hypnus` object, obfuscation mode, and a reference to the master fiber.
-                let fiber_ctx = Box::new(FiberContext {
-                    hypnus: Box::new(hypnus),
-                    obf,
-                    master,
-                });
-
-                // Creates a new fiber with 1MB stack, pointing to the `hypnus_fiber` function.
-                // The context is passed as a raw pointer to the entry point.
-                let fiber = CreateFiber(
-                    0x100000, 
-                    Some(hypnus_fiber), 
-                    Box::into_raw(fiber_ctx).cast()
-                );
-                
-                if fiber.is_null() {
-                    return;
-                }
-
-                // Switches execution to the new fiber
-                SwitchToFiber(fiber);
-
-                // Once execution returns, the fiber is deleted
-                DeleteFiber(fiber);
-
-                // Converts the fiber back into a regular thread
-                ConvertFiberToThread();
-            }
-            Err(_error) => {
-                #[cfg(debug_assertions)]
-                dinvk::println!("[Hypnus::new] {:?}", _error);
-            }
-        }
-    }
 }
 
 trait Asu64 {
@@ -973,7 +1019,7 @@ impl<T> Asu64 for T {
 /// Iterates over all entries in the process heap and applies
 /// an XOR operation to the data of entries marked as allocated.
 fn obfuscate_heap(key: &[u8; 8]) {
-    let heap = HypnusHeap::heap();
+    let heap = HypnusHeap::get();
     if heap.is_null() {
         return;
     }

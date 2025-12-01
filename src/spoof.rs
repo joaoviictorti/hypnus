@@ -1,29 +1,65 @@
-// Copyright (c) 2025 joaoviictorti
-// Licensed under the MIT License. See LICENSE file in the project root for details.
-
 use alloc::string::String;
-use core::{ops::Add, ptr::null_mut};
+use core::{ops::Add, ptr::null_mut, slice::from_raw_parts};
 
 use uwd::ignoring_set_fpreg;
 use obfstr::obfstring as s;
 use anyhow::{Context, Result, bail};
+use dinvk::types::{
+    CONTEXT, 
+    IMAGE_RUNTIME_FUNCTION, 
+    IMAGE_DIRECTORY_ENTRY_EXCEPTION
+};
 use dinvk::{
-    NtCurrentProcess,
-    NT_SUCCESS,
-    data::CONTEXT,
-    pe::PE,
+    winapis::{NtCurrentProcess, NT_SUCCESS},
+    helper::PE,
 };
 
-use crate::{Obfuscation, data::*};
-use super::{Config, Gadget, GadgetKind};
-use super::{
-    NtAllocateVirtualMemory,
+use crate::{Obfuscation, types::*};
+use crate::config::Config;
+use crate::gadget::{scan_runtime, GadgetKind};
+use crate::winapis::{
     NtLockVirtualMemory,
+    NtAllocateVirtualMemory,
     NtProtectVirtualMemory
 };
 
-/// Represents a reserved stack region for custom thread execution,
-/// including calculated frame sizes for known Windows APIs.
+/// Provides access to the unwind (exception handling) information of a PE image.
+#[derive(Debug)]
+pub struct Unwind {
+    /// Reference to the parsed PE image.
+    pub pe: PE,
+}
+
+impl Unwind {
+    /// Creates a new [`Unwind`].
+    pub fn new(pe: PE) -> Self {
+        Unwind { pe }
+    }
+
+    /// Returns all runtime function entries.
+    pub fn entries(&self) -> Option<&[IMAGE_RUNTIME_FUNCTION]> {
+        let nt = self.pe.nt_header()?;
+        let dir = unsafe {
+            (*nt).OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION]
+        };
+
+        if dir.VirtualAddress == 0 || dir.Size == 0 {
+            return None;
+        }
+
+        let addr = (self.pe.base as usize + dir.VirtualAddress as usize) as *const IMAGE_RUNTIME_FUNCTION;
+        let len = dir.Size as usize / size_of::<IMAGE_RUNTIME_FUNCTION>();
+
+        Some(unsafe { from_raw_parts(addr, len) })
+    }
+
+    /// Finds a runtime function by its RVA.
+    pub fn function_by_offset(&self, offset: u32) -> Option<&IMAGE_RUNTIME_FUNCTION> {
+        self.entries()?.iter().find(|f| f.BeginAddress == offset)
+    }
+}
+
+/// Represents a reserved stack region for custom thread execution.
 #[derive(Default, Debug, Clone, Copy)]
 pub struct StackSpoof {
     /// Address of a `gadget_rbp`, which realigns the stack (`mov rsp, rbp; ret`).
@@ -46,12 +82,8 @@ pub struct StackSpoof {
 }
 
 impl StackSpoof {
-    /// Create a new [`Stack`].
-    ///
-    /// # Arguments
-    ///
-    /// * `cfg` - A [`Config`] instance with loaded base addresses and function pointers.
-    #[inline(always)]
+    /// Create a new `StackSpoof`.
+    #[inline]
     pub fn new(cfg: &Config) -> Result<Self> {
         let mut stack = Self::alloc_memory(cfg)?;
         stack.frames(cfg)?;
@@ -59,10 +91,6 @@ impl StackSpoof {
     }
 
     /// Allocates memory required for spoofed stack execution.
-    ///
-    /// # Returns
-    ///
-    /// Partially constructed [`Stack`] with memory in place.
     pub fn alloc_memory(cfg: &Config) -> Result<Self> {
         // Check that the algo module contains a gadget `call [rbx]` or `jmp [rbx]`
         let kind = GadgetKind::detect(cfg.modules.kernelbase.as_ptr())?;
@@ -79,7 +107,7 @@ impl StackSpoof {
             MEM_COMMIT | MEM_RESERVE, 
             PAGE_READWRITE
         )) {
-            bail!(s!("Failed to allocate memory for gadget code"));
+            bail!(s!("failed to allocate memory for gadget code"));
         }
 
         unsafe {
@@ -95,7 +123,7 @@ impl StackSpoof {
             PAGE_EXECUTE_READ as u32, 
             &mut old_protect
         )) {
-            bail!(s!("Failed to change memory protection for RX"));
+            bail!(s!("failed to change memory protection for RX"));
         }
 
         // Allocate pointer to gadget
@@ -109,7 +137,7 @@ impl StackSpoof {
             MEM_COMMIT | MEM_RESERVE, 
             PAGE_READWRITE
         )) {
-            bail!(s!("Failed to allocate gadget pointer page"));
+            bail!(s!("failed to allocate gadget pointer page"));
         }
 
         unsafe {
@@ -122,7 +150,7 @@ impl StackSpoof {
             NtLockVirtualMemory(NtCurrentProcess(), &mut gadget_ptr, &mut ptr_size, VM_LOCK_1);
         }
 
-        Ok(StackSpoof {
+        Ok(Self {
             gadget_rbp: gadget_ptr as u64,
             gadget: kind,
             ..Default::default()
@@ -130,70 +158,49 @@ impl StackSpoof {
     }
 
     /// Resolves stack frame sizes for known Windows thread routines using unwind metadata.
-    ///
-    /// # Arguments
-    ///
-    /// * `cfg` - A [`Config`] with resolved DLL base addresses and function pointers.
-    ///
-    /// # Returns
-    ///
-    /// Error if any unwind info is missing or frame size cannot be computed.
     pub fn frames(&mut self, cfg: &Config) -> Result<()> {
-        let pe_ntdll = PE::parse(cfg.modules.ntdll.as_ptr());
-        let pe_kernel32 = PE::parse(cfg.modules.kernel32.as_ptr());
+        let pe_ntdll = Unwind::new(PE::parse(cfg.modules.ntdll.as_ptr()));
+        let pe_kernel32 = Unwind::new(PE::parse(cfg.modules.kernel32.as_ptr()));
 
         let rtl_user = pe_ntdll
-            .unwind()
             .function_by_offset(cfg.rtl_user_thread.as_u64() as u32 - cfg.modules.ntdll.as_u64() as u32)
-            .context(s!("Missing unwind: RtlUserThreadStart"))?;
+            .context(s!("missing unwind: RtlUserThreadStart"))?;
 
         let base_thread = pe_kernel32
-            .unwind()
             .function_by_offset(cfg.base_thread.as_u64() as u32 - cfg.modules.kernel32.as_u64() as u32)
-            .context(s!("Missing unwind: BaseThreadInitThunk"))?;
+            .context(s!("missing unwind: BaseThreadInitThunk"))?;
 
         let enum_date = pe_kernel32
-            .unwind()
             .function_by_offset(cfg.enum_date.as_u64() as u32 - cfg.modules.kernel32.as_u64() as u32)
-            .context(s!("Missing unwind: EnumDateFormatsExA"))?;
+            .context(s!("missing unwind: EnumDateFormatsExA"))?;
 
         let rtl_acquire_srw = pe_ntdll
-            .unwind()
             .function_by_offset(cfg.rtl_acquire_lock.as_u64() as u32 - cfg.modules.ntdll.as_u64() as u32)
-            .context(s!("Missing unwind: RtlAcquireSRWLockExclusive"))?;
+            .context(s!("missing unwind: RtlAcquireSRWLockExclusive"))?;
 
         self.rtl_user_thread_size = ignoring_set_fpreg(cfg.modules.ntdll.as_ptr(), rtl_user)
-            .context(s!("Failed to get frame size: RtlUserThreadStart"))?;
+            .context(s!("failed to get frame size: RtlUserThreadStart"))?;
 
         self.base_thread_size = ignoring_set_fpreg(cfg.modules.kernel32.as_ptr(), base_thread)
-            .context(s!("Failed to get frame size: BaseThreadInitThunk"))?;
+            .context(s!("failed to get frame size: BaseThreadInitThunk"))?;
 
         self.enum_date_size = ignoring_set_fpreg(cfg.modules.kernel32.as_ptr(), enum_date)
-            .context(s!("Failed to get frame size: EnumDateFormatsExA"))?;
+            .context(s!("failed to get frame size: EnumDateFormatsExA"))?;
 
         self.rlt_acquire_srw_size = ignoring_set_fpreg(cfg.modules.ntdll.as_ptr(), rtl_acquire_srw)
-            .context(s!("Failed to get frame size: RtlAcquireSRWLockExclusive"))?;
+            .context(s!("failed to get frame size: RtlAcquireSRWLockExclusive"))?;
 
         Ok(())
     }
 
-    /// Constructs a forged [`CONTEXT`] structure simulating a spoofed call chain.
+    /// Constructs a forged `CONTEXT` structure simulating a spoofed call chain.
     ///
     /// This function emulates a legitimate return sequence through:
     /// - `ZwWaitForWorkViaWorkerFactory`
     /// - `RtlAcquireSRWLockExclusive`  
     /// - `BaseThreadInitThunk`  
     /// - `RtlUserThreadStart`
-    ///
-    /// # Arguments
-    ///
-    /// * `cfg` - Reference to a [`Config`] containing resolved function addresses and stack sizes.
-    /// * `ctx` - Original [`CONTEXT`] captured from the target thread, used as a base.
-    ///
-    /// # Returns
-    ///
-    /// A [`CONTEXT`] with forged `RSP` and `RIP`, ready to be applied to a suspended thread.
-    #[inline(always)]
+    #[inline]
     pub fn spoof_context(&self, cfg: &Config, ctx: CONTEXT) -> CONTEXT {
         unsafe {
             // Construct a fake execution context for the current thread,
@@ -238,32 +245,24 @@ impl StackSpoof {
 
     /// Applies a fake call stack layout to a series of thread contexts,
     /// simulating a legitimate execution.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctxs` - Mutable slice of [`CONTEXT`] objects to receive the forged stack layout.
-    /// * `cfg` - Reference to the [`Config`] containing resolved API addresses and gadget pointers.
-    /// * `kind` - Obfuscation strategy variant [`Obfuscation`] to determine layout behavior.
-    ///
-    /// # Returns
-    ///
-    /// If the stack layout was applied successfully to all contexts.
     pub fn spoof(&self, ctxs: &mut [CONTEXT], cfg: &Config, kind: Obfuscation) -> Result<()> {
-        let pe_kernelbase = PE::parse(cfg.modules.kernelbase.as_ptr());
-        let tables = pe_kernelbase.unwind().entries().context(s!(
-            "Failed to read IMAGE_RUNTIME_FUNCTION entries from .pdata section"
-        ))?;
+        let pe_kernelbase = Unwind::new(PE::parse(cfg.modules.kernelbase.as_ptr()));
+        let tables = pe_kernelbase
+            .entries()
+            .context(s!(
+                "failed to read IMAGE_RUNTIME_FUNCTION entries from .pdata section"
+            ))?;
 
         // Locate the target COP or JOP gadget
         let (gadget_addr, gadget_size) = self.gadget.resolve(cfg)?;
 
         // add rsp, 0x58 ; ret
-        let (add_rsp_addr, add_rsp_size) = Gadget::scan_runtime(
+        let (add_rsp_addr, add_rsp_size) = scan_runtime(
             cfg.modules.kernelbase.as_ptr(),
             &[0x48, 0x83, 0xC4, 0x58, 0xC3],
             tables
         )
-        .context(s!("Add RSP gadget not found"))?;
+        .context(s!("add rsp gadget not found"))?;
 
         unsafe {
             for ctx in ctxs.iter_mut() {

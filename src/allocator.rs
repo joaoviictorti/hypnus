@@ -1,14 +1,11 @@
-// Copyright (c) 2025 joaoviictorti
-// Licensed under the MIT License. See LICENSE file in the project root for details.
-
 use core::{
     alloc::{GlobalAlloc, Layout},
     ffi::c_void,
     ptr::{NonNull, null_mut},
 };
 
-use dinvk::data::HANDLE;
-use super::data::HEAP_GROWABLE;
+use dinvk::types::HANDLE;
+use crate::types::HEAP_GROWABLE;
 
 /// Global handle to the custom heap used by `HypnusHeap`.
 static mut HEAP_HANDLE: Option<NonNull<c_void>> = None;
@@ -18,7 +15,7 @@ pub struct HypnusHeap;
 
 impl HypnusHeap {
     /// Initializes a new private heap
-    fn create() -> HANDLE {
+    fn create_heap() -> HANDLE {
         let handle = unsafe { 
             RtlCreateHeap(
                 HEAP_GROWABLE, 
@@ -36,26 +33,18 @@ impl HypnusHeap {
     }
 
     /// Returns the handle to the default process heap.
-    pub fn heap() -> HANDLE {
+    pub fn get() -> HANDLE {
         unsafe { 
             HEAP_HANDLE.map(|p| p.as_ptr())
-                .unwrap_or_else(Self::create) 
+                .unwrap_or_else(Self::create_heap) 
         }
     }
 }
 
 unsafe impl GlobalAlloc for HypnusHeap {
     /// Allocates memory using the custom heap.
-    ///
-    /// # Arguments
-    ///
-    /// * `layout` - The memory layout to allocate.
-    ///
-    /// # Returns
-    ///
-    /// A pointer to the allocated memory, or `ptr::null_mut()` if allocation fails.
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let heap = Self::heap();
+        let heap = Self::get();
         let size = layout.size();
         if size == 0 {
             return null_mut();
@@ -65,15 +54,6 @@ unsafe impl GlobalAlloc for HypnusHeap {
     }
 
     /// Deallocates memory using the custom heap.
-    ///
-    /// # Arguments
-    ///
-    /// * `ptr` - A pointer to the memory to deallocate.
-    /// * `layout` - The memory layout.
-    ///
-    /// # Notes
-    ///
-    /// If `ptr` is null, this function does nothing.
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         if ptr.is_null() {
             return;
@@ -81,7 +61,7 @@ unsafe impl GlobalAlloc for HypnusHeap {
 
         unsafe { core::ptr::write_bytes(ptr, 0, layout.size()) };
         unsafe {
-            RtlFreeHeap(Self::heap(), 0, ptr.cast());
+            RtlFreeHeap(Self::get(), 0, ptr.cast());
         }
     }
 }
