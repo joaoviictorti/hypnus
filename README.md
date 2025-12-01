@@ -1,14 +1,12 @@
-# hypnus 🦀
+# hypnus
 
 ![Rust](https://img.shields.io/badge/made%20with-Rust-red)
 ![crate](https://img.shields.io/crates/v/hypnus.svg)
 ![docs](https://docs.rs/hypnus/badge.svg)
-[![build](https://github.com/joaoviictorti/hypnus/actions/workflows/ci.yml/badge.svg)](https://github.com/joaoviictorti/hypnus/actions/workflows/ci.yml)
-![Forks](https://img.shields.io/github/forks/joaoviictorti/hypnus)
-![Stars](https://img.shields.io/github/stars/joaoviictorti/hypnus)
-![License](https://img.shields.io/github/license/joaoviictorti/hypnus)
+![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-brightgreen)
+[![Actions status](https://github.com/joaoviictorti/hypnus/actions/workflows/ci.yml/badge.svg)](https://github.com/joaoviictorti/hypnus/actions)
 
-**Hypnus** is a Rust library for execution obfuscation, designed to protect memory regions during inactivity or sleep cycles. It leverages thread pool timers, wait objects and APC, all with dynamic call stack spoofing and optional heap obfuscation. Execution remains stealthy, and no thread duplication is required. It builds upon the dynamic spoofing foundation of the [uwd](https://github.com/joaoviictorti/uwd) library.
+Library for execution obfuscation, designed to protect memory regions during inactivity or sleep cycles. It leverages thread pool timers, wait objects and APC, all with dynamic call stack spoofing and optional heap obfuscation. Execution remains stealthy, and no thread duplication is required. It builds upon the dynamic spoofing foundation of the [uwd](https://github.com/joaoviictorti/uwd) library.
 
 ## Features
 
@@ -100,7 +98,7 @@ If you want to enable heap encryption or RWX protection, you must explicitly pas
 
 extern crate alloc;
 
-use hypnus::{foliage, ObfMode, HypnusHeap};
+use hypnus::{foliage, ObfMode, allocator::HypnusHeap};
 use core::ffi::c_void;
 
 #[unsafe(no_mangle)]
@@ -129,10 +127,6 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 ```
 
-## Additional Resources
-
-For more examples, check the [examples](https://github.com/joaoviictorti/uwd/tree/main/examples) folder in the repository.
-
 ## References
 
 I want to express my gratitude to these projects that inspired me to create `hypnus` and contribute with some features:
@@ -142,4 +136,14 @@ I want to express my gratitude to these projects that inspired me to create `hyp
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](https://github.com/joaoviictorti/uwd/tree/main/LICENSE) file for details.
+hypnus is licensed under either of
+
+- Apache License, Version 2.0, ([LICENSE-APACHE](https://github.com/joaoviictorti/hypnus/tree/main/LICENSE-APACHE) or
+  <https://www.apache.org/licenses/LICENSE-2.0>)
+- MIT license ([LICENSE-MIT](https://github.com/joaoviictorti/hypnus/tree/main/LICENSE-MIT) or <https://opensource.org/licenses/MIT>)
+
+at your option.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in hypnus
+by you, as defined in the Apache-2.0 license, shall be dually licensed as above, without any
+additional terms or conditions.
